@@ -443,7 +443,7 @@ function showPage(pg){
   document.getElementById("pg-"+pg).classList.add("on");
   document.getElementById("n-"+pg).classList.add("on");
   curPg=pg;
-  document.getElementById("fabBtn").style.display=(pg==="schedule"||pg==="board"||pg==="survey"||pg==="files")?"flex":"none";
+  document.getElementById("fabBtn").style.display=(pg==="schedule"||pg==="board"||pg==="survey")?"flex":"none";
 }
 function onFab(){
   if(curPg==="schedule") openAddSched();
