@@ -242,6 +242,15 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
     </div>
   </div>
 </div>
+<div class="mbg" id="pdfModal" style="z-index:500">
+  <div style="background:#fff;border-radius:16px;width:96%;height:90vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #eee;flex-shrink:0">
+      <div style="font-size:15px;font-weight:700;color:#1a3a7a" id="pdfModalTitle">PDF</div>
+      <button onclick="closePdfModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#666">✕</button>
+    </div>
+    <iframe id="pdfFrame" style="flex:1;width:100%;border:none" src="about:blank"></iframe>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <script>
 // ===== Firebase初期化 =====
@@ -811,6 +820,17 @@ function delFile(id){
   showToast(t("deleted"));
 }
 
+function openPdfModal(data, name){
+  document.getElementById("pdfModalTitle").textContent = name;
+  var frame = document.getElementById("pdfFrame");
+  // iframeにdata URIをセット（Safari対応）
+  frame.src = data;
+  document.getElementById("pdfModal").classList.add("on");
+}
+function closePdfModal(){
+  document.getElementById("pdfModal").classList.remove("on");
+  document.getElementById("pdfFrame").src = "about:blank";
+}
 function showToast(msg){ var el=document.getElementById("toast"); el.textContent=msg; el.style.display="block"; setTimeout(function(){ el.style.display="none"; },2500); }
 
 function renderCal(){
@@ -1009,9 +1029,8 @@ function updateFileNotice(){
     var el=document.createElement("div"); el.style.cssText="padding:8px 0;border-bottom:0.5px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:6px";
     var size=f.size>1024*1024?(f.size/1024/1024).toFixed(1)+"MB":(f.size/1024).toFixed(0)+"KB";
     el.innerHTML="<div style='flex:1'><div style='font-size:14px;font-weight:600'>📎 "+f.name+"</div><div style='font-size:11px;color:var(--sub)'>"+f.from+"さんから ・ "+size+"</div></div>";
-    var dlBtn=document.createElement("a"); dlBtn.textContent="⬇ 開く"; dlBtn.style.cssText="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px;flex-shrink:0;text-decoration:none;display:inline-block";
-    dlBtn.href=f.data; dlBtn.target="_blank"; dlBtn.rel="noopener";
-    dlBtn.style.textDecoration="none";
+    var dlBtn=document.createElement("button"); dlBtn.textContent="📄 開く"; dlBtn.style.cssText="background:var(--navy);color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px;flex-shrink:0";
+    dlBtn.onclick=(function(data,name){ return function(){ openPdfModal(data,name); }; })(f.data,f.name);
     var delBtn=document.createElement("button"); delBtn.textContent="✕"; delBtn.style.cssText="background:#fef0f0;border:1px solid #f8caca;border-radius:6px;color:var(--red);font-size:14px;cursor:pointer;flex-shrink:0;padding:4px 8px";
     delBtn.onclick=(function(id){ return function(){ delFile(id); }; })(f.id);
     el.appendChild(dlBtn); el.appendChild(delBtn); notice.appendChild(el);
