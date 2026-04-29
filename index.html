@@ -44,7 +44,7 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 .ca{background:none;border:0.5px solid var(--bd);border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--navy)}
 .cg{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
 .ch{text-align:center;font-size:11px;color:var(--sub);padding:3px 0;font-weight:500}
-.cd{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:7px;cursor:pointer;font-size:13px;position:relative}
+.cd{min-height:44px;display:flex;align-items:flex-start;justify-content:flex-start;border-radius:7px;cursor:pointer;font-size:13px;position:relative;padding:3px 2px;flex-direction:column}
 .cd.today{background:var(--navy)!important;color:#fff!important;font-weight:700}
 .cd.sel{background:var(--gold)!important;color:#fff!important}
 .cd.sat{color:#1a5ab5}.cd.wd{background:#f0f8f4}
@@ -165,6 +165,13 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
   <div class="card">
     <div class="tit">📋 最新の伝言</div>
     <div id="homeBoard"></div>
+  </div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="tit" style="margin:0">📜 就業規則</div>
+      <button id="editRulesBtn" onclick="openEditRules()" style="display:none;background:none;border:1px solid var(--bd);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--sub);cursor:pointer;font-family:inherit">✏️ 編集</button>
+    </div>
+    <div id="rulesContent" style="font-size:14px;color:#333;line-height:1.8;white-space:pre-wrap">読み込み中...</div>
   </div>
   <div class="card" style="background:linear-gradient(135deg,#1a3a7a,#2a5ab5);border:none">
     <div style="color:#aabde8;font-size:13px;margin-bottom:8px">今後追加予定</div>
@@ -327,7 +334,24 @@ function listenAll(){
   db.ref("staffData").on("value", function(snap){
     var v = snap.val();
     if(v && Array.isArray(v) && v.length > 0) staff = v;
+    else if(v && !Array.isArray(v)){
+      var arr=Object.values(v).filter(function(x){ return x&&x.name; });
+      if(arr.length>0) staff=arr;
+    }
     renderStaff(staff);
+    updateStaffCount();
+  });
+  // 就業規則
+  db.ref("rulesData").on("value", function(snap){
+    var v=snap.val();
+    if(v && v.content){
+      rulesData=v;
+      var el=document.getElementById("rulesContent");
+      if(el) el.textContent=v.content;
+    } else {
+      var el=document.getElementById("rulesContent");
+      if(el) el.textContent="就業規則はまだ登録されていません。";
+    }
   });
   db.ref("fileData").on("value", function(snap){
     var v = snap.val();
@@ -429,7 +453,7 @@ var LNG={
     delSched:"この予定を削除しますか？",delBoard:"この伝言を削除しますか？",delSurv:"このアンケートを削除しますか？",
     votes:"票",persons:"名",answers:"回答数",deadline:"締切",
     newBadge:"新着",noBoard:"伝言はありません",noSurvey:"アンケートはありません",
-    addSchedT:"📅 予定を追加",addBoardT:"📋 伝言を投稿",addSurvT:"📊 アンケート作成",editT:"✏️ ホーム情報を編集",
+    addSchedT:"📅 予定を追加",addBoardT:"📋 伝言を投稿",addSurvT:"📊 アンケート作成",editT:"✏ ホーム情報を編集",
     dateLbl:"日付",startLbl:"開始時間",endLbl:"終了時間",contentLbl:"内容",memberLbl:"担当者（名簿から選択）",
     titleLbl:"タイトル",bodyLbl:"内容",deadlineLbl:"締切日",opt1:"選択肢1",opt2:"選択肢2",
     staffSelLbl:"スタッフ名を選択",deptLbl:"所属",iniLbl:"アイコン文字（1〜2文字）",
@@ -449,7 +473,7 @@ var LNG={
     delSched:"Xóa lịch này?",delBoard:"Xóa tin này?",delSurv:"Xóa khảo sát này?",
     votes:"phiếu",persons:"người",answers:"Số trả lời",deadline:"Hạn",
     newBadge:"Mới",noBoard:"Không có tin nhắn",noSurvey:"Không có khảo sát",
-    addSchedT:"📅 Thêm lịch",addBoardT:"📋 Đăng tin nhắn",addSurvT:"📊 Tạo khảo sát",editT:"✏️ Chỉnh sửa thông tin",
+    addSchedT:"📅 Thêm lịch",addBoardT:"📋 Đăng tin nhắn",addSurvT:"📊 Tạo khảo sát",editT:"✏ Chỉnh sửa thông tin",
     dateLbl:"Ngày",startLbl:"Giờ bắt đầu",endLbl:"Giờ kết thúc",contentLbl:"Nội dung",memberLbl:"Người phụ trách",
     titleLbl:"Tiêu đề",bodyLbl:"Nội dung",deadlineLbl:"Hạn",opt1:"Lựa chọn 1",opt2:"Lựa chọn 2",
     staffSelLbl:"Chọn nhân viên",deptLbl:"Bộ phận",iniLbl:"Chữ icon (1-2 ký tự)",
@@ -470,7 +494,7 @@ var LNG={
     added:"Đã thêm lịch",posted:"Đã đăng",created:"Đã tạo khảo sát",
     voted:"Đã bỏ phiếu",deleted:"Đã xóa",updated:"Đã cập nhật",
     addSchedT:"📅 Thêm lịch",addBoardT:"📋 Đăng tin",addSurvT:"📊 Tạo khảo sát",
-    editT:"✏️ Chỉnh sửa thông tin",
+    editT:"✏ Chỉnh sửa thông tin",
     dateLbl:"Ngày",startLbl:"Giờ bắt đầu",endLbl:"Giờ kết thúc",
     contentLbl:"Nội dung",memberLbl:"Người phụ trách",
     titleLbl:"Tiêu đề",bodyLbl:"Nội dung",deadlineLbl:"Hạn chót",
@@ -687,7 +711,7 @@ function openAddStaff(){
 function openEditBoard(id){
   var b=boardData.find(function(x){ return x.id===id||parseInt(x.id)===id; }); if(!b) return;
   modalMode="editboard";
-  openModal("✏️ 伝言を編集",
+  openModal("✏ 伝言を編集",
     "<input type='hidden' id='feditid' value='"+id+"'>"+
     "<div class='fg'><label class='fl'>"+t("titleLbl")+"</label><input class='fi' id='fedittitle' value='"+b.title+"'></div>"+
     "<div class='fg'><label class='fl'>"+t("bodyLbl")+"</label><textarea class='fi' id='feditbody' rows='4' style='resize:vertical'>"+b.body+"</textarea></div>"
@@ -695,7 +719,13 @@ function openEditBoard(id){
 }
 
 function submitModal(){
-  if(modalMode==="home"){
+  if(modalMode==="editrules"){
+    var txt=document.getElementById("frulestext").value;
+    rulesData={content:txt, updatedBy:hUser.name, updatedAt:new Date().toLocaleDateString("ja-JP")};
+    if(db){ try{ db.ref("rulesData").set(rulesData); }catch(e){} }
+    document.getElementById("rulesContent").textContent=txt;
+    showToast("📜 就業規則を更新しました");
+  } else if(modalMode==="home"){
     var v=document.getElementById("fhstaff").value;
     if(v){ hUser.name=v.split("|")[0]; hUser.dept=document.getElementById("fhdept").value||hUser.dept; }
     else { hUser.dept=document.getElementById("fhdept").value||hUser.dept; }
@@ -993,7 +1023,7 @@ function openEditSched(ds, id){
   var data=schedData[ds]||[];
   var s=data.find(function(x){ return x.id===id; }); if(!s) return;
   modalMode="editsched";
-  document.getElementById("modalTitle").textContent="✏️ 予定を編集";
+  document.getElementById("modalTitle").textContent="✏ 予定を編集";
   document.getElementById("modalBody").innerHTML=
     "<input type='hidden' id='feschedds' value='"+ds+"'>"+
     "<input type='hidden' id='feschedid' value='"+id+"'>"+
@@ -1023,7 +1053,7 @@ function renderDayDetail(ds){
     var mid=s.member?"<div style='font-size:12px;color:var(--sub);margin-top:3px'>👤 "+s.member+"</div>":"";
     var delBtn=document.createElement("button"); delBtn.className="db"; delBtn.textContent="✕";
     delBtn.onclick=(function(ds2,id){ return function(){ delSched(ds2,id); }; })(ds,s.id);
-    var editBtn=document.createElement("button"); editBtn.className="db"; editBtn.textContent="✏️";
+    var editBtn=document.createElement("button"); editBtn.className="db"; editBtn.textContent="✏";
     editBtn.style.cssText="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;padding:0 2px;flex-shrink:0;line-height:1";
     editBtn.onclick=(function(ds2,id){ return function(){ openEditSched(ds2,id); }; })(ds,s.id);
     var transBtn2=document.createElement("button"); transBtn2.textContent="🌐"; transBtn2.title="翻訳";
@@ -1058,12 +1088,12 @@ function renderBoard(){
     var el=document.createElement("div"); el.className="bi"+(isUnread?" ni2":"");
     // ✅ 既読ボタン
     var readBtn=document.createElement("button");
-    readBtn.textContent=isUnread?"✅":"☑️";
+    readBtn.textContent=isUnread?"✅":"☑";
     readBtn.title=isUnread?"既読にする":"既読済み";
     readBtn.style.cssText="position:absolute;top:6px;right:78px;background:#e8f5ee;border:1.5px solid #2a7a4a;border-radius:6px;color:#2a7a4a;font-size:13px;cursor:pointer;padding:3px 7px;font-weight:700";
     readBtn.onclick=(function(id){ return function(){ markRead(id); }; })(b.id);
-    // ✏️ 編集ボタン
-    var editBtn=document.createElement("button"); editBtn.className="bedit"; editBtn.textContent="✏️";
+    // ✏ 編集ボタン
+    var editBtn=document.createElement("button"); editBtn.className="bedit"; editBtn.textContent="✏";
     editBtn.style.cssText="position:absolute;top:8px;right:30px;background:none;border:none;color:#aaa;font-size:14px;cursor:pointer;line-height:1";
     editBtn.onclick=(function(id){ return function(){ openEditBoard(id); }; })(b.id);
     // 🌐 翻訳ボタン
@@ -1320,6 +1350,35 @@ function clearInitData(){
   renderAll();
   showToast("サンプルデータを削除しました。自分が追加したデータも消えました");
 }
+// ===== 就業規則 =====
+var rulesData = {content:"就業規則を読み込み中..."};
+function loadRules(){
+  if(db){
+    db.ref("rulesData").on("value", function(snap){
+      var v=snap.val();
+      if(v && v.content){
+        rulesData=v;
+        document.getElementById("rulesContent").textContent=v.content;
+      } else {
+        document.getElementById("rulesContent").textContent="就業規則はまだ登録されていません。管理者が編集ボタンから登録できます。";
+      }
+    });
+  }
+  // 管理者のみ編集ボタンを表示
+  var editBtn=document.getElementById("editRulesBtn");
+  if(editBtn && hUser.name===ADMIN_NAME) editBtn.style.display="block";
+}
+function openEditRules(){
+  modalMode="editrules";
+  document.getElementById("modalTitle").textContent="📜 就業規則を編集";
+  var ta=document.createElement("textarea"); ta.className="fi"; ta.id="frulestext"; ta.rows=12; ta.style.cssText="resize:vertical;font-size:13px;line-height:1.7"; ta.value=rulesData.content||"";
+  var wrap=document.createElement("div"); wrap.className="fg";
+  var lbl=document.createElement("label"); lbl.className="fl"; lbl.textContent="就業規則の内容";
+  var hint=document.createElement("div"); hint.style.cssText="font-size:11px;color:var(--sub);margin-top:4px"; hint.textContent="※ 改行・箇条書きそのまま入力できます";
+  wrap.appendChild(lbl); wrap.appendChild(ta); wrap.appendChild(hint);
+  document.getElementById("modalBody").innerHTML=""; document.getElementById("modalBody").appendChild(wrap);
+  document.getElementById("modal").classList.add("on");
+}
 function reloadAll(){
   renderAll();
   showToast("🔄 更新しました");
@@ -1334,6 +1393,7 @@ loadUser();
 applyUser();
 renderAll();
 buildDeptFilters();
+loadRules();
 // Firebase SDKロード後に初期化
 window.addEventListener('load', function(){
   initFirebase();
