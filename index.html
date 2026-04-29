@@ -116,8 +116,8 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
       <button class="lbtn" id="btn-vi" onclick="setLang('vi')">Tiếng Việt</button>
     </div>
     <div class="bw">
-      <button class="nb" onclick="showPage('board')"><span style="font-size:19px;color:#fff">🔔</span><span class="nd" id="bDot">3</span></button>
-      <button class="nb" onclick="showPage('schedule')"><span style="font-size:19px;color:#fff">📅</span><span class="nd" id="sDot">2</span></button>
+      <button class="nb" onclick="showPage('board')"><span style="font-size:19px;color:#fff">🔔</span><span class="nd" id="bDot" style="display:none">0</span></button>
+      <button class="nb" onclick="showPage('schedule')"><span style="font-size:19px;color:#fff">📅</span><span class="nd" id="sDot" style="display:none">0</span></button>
     </div>
   </div>
 </div>
@@ -464,7 +464,8 @@ function buildDeptFilters(){
   });
 }
 function getFilteredSched(ds){
-  var data=getFilteredSched(ds);
+  var raw=schedData[ds];
+  var data=raw ? (Array.isArray(raw) ? raw : Object.values(raw)) : [];
   if(schedFilter==="all") return data;
   if(schedFilter==="me") return data.filter(function(s){
     return !s.member||s.member===""||s.member==="全員"||s.member.indexOf(hUser.name)>=0;
@@ -536,6 +537,13 @@ function deptOpts2(){
   Object.keys(depts).forEach(function(d){ o+="<option value='dept:"+d+"'>🏢 "+d+"（全員）</option>"; });
   return o;
 }
+function onMemberSel(){
+  var v=document.getElementById("fmember").value;
+  var extra=document.getElementById("fmemberExtra");
+  if(extra){
+    extra.style.display=(v==="" || v==="全員" || (v&&v.indexOf("dept:")===0)) ? "none" : "block";
+  }
+}
 function openAddSched(){
   modalMode="sched";
   var d=selDate||todayStr;
@@ -550,7 +558,12 @@ function openAddSched(){
     "<div class='tr'><div class='fg'><label class='fl'>"+t("startLbl")+"</label><select class='fi' id='fstart'>"+timeOpts("09:00")+"</select></div>"+
     "<div class='fg'><label class='fl'>"+t("endLbl")+"</label><select class='fi' id='fend'>"+timeOpts("10:00")+"</select></div></div>"+
     "<div class='fg'><label class='fl'>"+t("contentLbl")+"</label><input class='fi' id='ftitle' placeholder='"+t("plContent")+"'></div>"+
-    "<div class='fg'><label class='fl'>参加メンバー（名簿・部署・全員）</label><select class='fi' id='fmember' size='1'>"+memberSel+"</select></div>"
+    "<div class='fg'><label class='fl'>参加メンバー</label>"+
+    "<select class='fi' id='fmember' onchange='onMemberSel()'>"+memberSel+"</select></div>"+
+    "<div class='fg' id='fmemberExtra' style='display:none'><label class='fl'>追加メンバー（複数可）</label>"+
+    "<select class='fi' id='fmember2' multiple style='height:120px'>"+
+    staff.map(function(s){ return "<option value='"+s.name+"'>"+s.name+" ("+s.dept+")</option>"; }).join("")+
+    "</select><div style='font-size:11px;color:var(--sub);margin-top:4px'>※ 複数選ぶ場合はCtrlキー（スマホは長押し）を押しながらタップ</div></div>"
   );
 }
 function openAddBoard(){
@@ -633,12 +646,20 @@ function submitModal(){
     if(st>=en){ showToast(t("timeErr")); return; }
     if(!schedData[d]) schedData[d]=[];
     schedIdCounter++;
-    // 部署選択の場合はメンバー名を展開
+    // メンバー処理
     var memberStr=mb;
     if(mb && mb.indexOf("dept:")===0){
       var dept=mb.slice(5);
       var names=staff.filter(function(s){ return s.dept===dept; }).map(function(s){ return s.name; });
       memberStr=names.join("、");
+    } else if(mb && mb!=="" && mb!=="全員"){
+      // 追加メンバーがあれば結合
+      var extra2=document.getElementById("fmember2");
+      if(extra2){
+        var extras=Array.from(extra2.selectedOptions).map(function(o){ return o.value; });
+        extras=extras.filter(function(n){ return n!==mb; });
+        if(extras.length>0) memberStr=mb+"、"+extras.join("、");
+      }
     }
     schedData[d].push({id:schedIdCounter,st:st,et:en,title:ti,member:memberStr});
     schedData[d].sort(function(a,b){ return a.st>b.st?1:-1; });
