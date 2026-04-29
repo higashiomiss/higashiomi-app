@@ -844,6 +844,20 @@ function delFile(id){
   showToast(t("deleted"));
 }
 
+function translateText(text, callback){
+  // MyMemory無料翻訳API（キー不要）
+  var url="https://api.mymemory.translated.net/get?q="+encodeURIComponent(text)+"&langpair=ja|vi";
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d.responseStatus===200){
+        callback(d.responseData.translatedText);
+      } else {
+        showToast("翻訳できませんでした");
+      }
+    })
+    .catch(function(){ showToast("翻訳サービスに接続できませんでした"); });
+}
 function openPdfModal(data, name){
   document.getElementById("pdfModalTitle").textContent = name;
   document.getElementById("pdfModal").classList.add("on");
@@ -864,7 +878,12 @@ function openPdfModal(data, name){
       return;
     }
     pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-    pdfjsLib.getDocument(data).promise.then(function(pdf){
+    // data URIをUint8Arrayに変換してPDF.jsに渡す
+    var base64 = data.split(",")[1];
+    var binary = atob(base64);
+    var bytes = new Uint8Array(binary.length);
+    for(var i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+    pdfjsLib.getDocument({data: bytes}).promise.then(function(pdf){
       container.innerHTML = "";
       var totalPages = pdf.numPages;
       var renderPage = function(pageNum){
@@ -958,8 +977,14 @@ function renderDayDetail(ds){
     var editBtn=document.createElement("button"); editBtn.className="db"; editBtn.textContent="✏️";
     editBtn.style.cssText="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;padding:0 2px;flex-shrink:0;line-height:1";
     editBtn.onclick=(function(ds2,id){ return function(){ openEditSched(ds2,id); }; })(ds,s.id);
+    var transBtn2=document.createElement("button"); transBtn2.textContent="🌐"; transBtn2.title="翻訳";
+    transBtn2.style.cssText="background:none;border:none;color:#aaa;font-size:14px;cursor:pointer;padding:0 2px;flex-shrink:0";
+    transBtn2.onclick=(function(title,member){ return function(){
+      translateText(title+(member?" 担当: "+member:""), function(tr){ showToast("🌐 "+tr); });
+    }; })(s.title, s.member);
     row.innerHTML="<div class='tt'>"+timeStr+"</div><div class='tb'><div class='tc'><div style='font-weight:600;font-size:15px'>"+s.title+"</div>"+mid+"</div></div>";
     var tb=row.querySelector(".tb");
+    tb.appendChild(transBtn2);
     tb.appendChild(editBtn);
     tb.appendChild(delBtn);
     slots.appendChild(row);
@@ -976,7 +1001,18 @@ function renderBoard(){
     delBtn.onclick=(function(id){ return function(){ delBoard(id); }; })(b.id);
     var editBtn=document.createElement("button"); editBtn.className="bedit"; editBtn.textContent="✏️";
     editBtn.onclick=(function(id){ return function(){ openEditBoard(id); }; })(b.id);
+    var transBtn=document.createElement("button"); transBtn.className="bedit"; transBtn.textContent="🌐";
+    transBtn.title="ベトナム語に翻訳";
+    transBtn.style.cssText="position:absolute;top:8px;right:52px;background:none;border:none;color:#aaa;font-size:14px;cursor:pointer";
+    transBtn.onclick=(function(bid){ return function(){
+      var bitem=boardData.find(function(x){ return x.id===bid||parseInt(x.id)===bid; });
+      if(!bitem) return;
+      translateText(bitem.title+"。"+bitem.body, function(translated){
+        showToast("🌐 "+translated.slice(0,60)+(translated.length>60?"...":""));
+      });
+    }; })(b.id);
     el.innerHTML="<div style='font-weight:600;font-size:15px;padding-right:52px'>"+b.title+nb+"</div><div style='font-size:14px;color:#444;margin-top:4px'>"+b.body+"</div><div class='ba'>"+b.author+" ・ "+b.time+"</div>";
+    el.appendChild(transBtn);
     el.appendChild(editBtn); el.appendChild(delBtn);
     list.appendChild(el);
   });
