@@ -588,7 +588,7 @@ function openAddFile(){
   staff.forEach(function(s){ toOpts+="<option value='"+s.name+"'>"+s.name+"</option>"; });
   openModal(t("addFile"),
     "<div class='fg'><label class='fl'>"+t("fileTo")+"</label><select class='fi' id='ffileto'>"+toOpts+"</select></div>"+
-    "<div class='fg'><label class='fl'>"+t("fileBtn")+"</label><input class='fi' type='file' id='ffile' accept='image/*,.pdf,.doc,.docx,.xls,.xlsx' style='padding:6px'></div>"+
+    "<div class='fg'><label class='fl'>📄 PDFファイルを選択（3MB以下）</label><input class='fi' type='file' id='ffile' accept='.pdf,application/pdf' style='padding:6px'></div>"+
     "<div class='fg'><label class='fl'>"+t("fileNote")+"</label><input class='fi' id='ffilenote' placeholder='メモ（任意）'></div>"
   );
 }
@@ -709,7 +709,7 @@ function submitModal(){
     if(!toEl.value){ showToast("宛先を選択してください"); return; }
     if(!fileEl.files||!fileEl.files[0]){ showToast("ファイルを選択してください"); return; }
     var file=fileEl.files[0];
-    if(file.size>5*1024*1024){ showToast("5MB以下のファイルを選択してください"); return; }
+    if(file.size>3*1024*1024){ showToast("3MB以下のPDFを選択してください"); return; }
     var reader=new FileReader();
     reader.onload=function(e){
       fileData.unshift({id:Date.now(),to:toEl.value,from:hUser.name,name:file.name,size:file.size,data:e.target.result,note:note,time:"今"});
@@ -941,15 +941,17 @@ function updateFileNotice(){
     dlBtn.onclick=(function(data,name){
       return function(){
         try{
-          var w=window.open("","_blank");
-          if(w){
-            w.document.write("<html><body style='margin:0;padding:20px'><p style='font-size:16px;margin-bottom:16px'>"+name+"</p><img src=\""+data+"\" style='max-width:100%;margin-bottom:16px' onerror=\"this.style.display=\'none\'\"><br><a href=\""+data+"\" download=\""+name+"\" style=\"display:inline-block;background:#1a3a7a;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-size:16px\">⬇ 保存する</a></body></html>");
-            w.document.close();
-          } else {
-            var a=document.createElement("a"); a.href=data; a.download=name; a.target="_blank"; a.click();
-          }
+          var arr=data.split(",");
+          var mime=arr[0].match(/:(.*?);/)[1];
+          var bstr=atob(arr[1]);
+          var n=bstr.length;
+          var u8arr=new Uint8Array(n);
+          while(n--){ u8arr[n]=bstr.charCodeAt(n); }
+          var blob=new Blob([u8arr],{type:mime});
+          var url=URL.createObjectURL(blob);
+          window.open(url,"_blank");
         }catch(e){
-          var a=document.createElement("a"); a.href=data; a.download=name; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          window.open(data,"_blank");
         }
       };
     })(f.data,f.name);
