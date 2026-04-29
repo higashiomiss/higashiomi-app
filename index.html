@@ -99,6 +99,8 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 .ns{text-align:center;padding:18px;color:var(--sub);font-size:13px}
 .eb{background:none;border:1px solid var(--bd);border-radius:6px;padding:3px 9px;font-size:12px;color:var(--sub);cursor:pointer;font-family:inherit;margin-left:8px}
 .sync-bar{background:#e8f5ee;border-radius:8px;padding:6px 12px;font-size:12px;color:#2a7a4a;text-align:center;margin-bottom:8px;display:none}
+.filt-btn{background:#f0f4ff;border:1.5px solid var(--bd);border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--sub);white-space:nowrap}
+.filt-btn.on{background:var(--navy);color:#fff;border-color:var(--navy)}
 </style>
 </head>
 <body>
@@ -166,17 +168,17 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
     <span style="background:rgba(255,255,255,0.15);color:#fff;border-radius:8px;padding:8px 12px;font-size:13px;display:inline-block;margin:3px">📦 在庫管理</span>
     <span style="background:rgba(255,255,255,0.15);color:#fff;border-radius:8px;padding:8px 12px;font-size:13px;display:inline-block;margin:3px">📈 生産実績</span>
   </div>
-  <div class="card" style="border:1.5px solid #f8caca;background:#fff8f8">
-    <div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:10px">🗑️ データ管理（管理者用）</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px">
-      <button class="btn bsm" style="background:#d94040" onclick="clearAllData()">全データをリセット</button>
-      <button class="btn bsm bo" onclick="clearInitData()">サンプルデータを削除</button>
-    </div>
-    <div style="font-size:11px;color:var(--sub);margin-top:8px">※ リセットすると全員のデータが消えます</div>
-  </div>
+
 </div>
 
 <div class="pg" id="pg-schedule">
+  <div class="card" style="padding:10px">
+    <div style="font-size:12px;color:var(--sub);margin-bottom:6px;font-weight:500">📋 表示するスケジュール</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap" id="schedFilter">
+      <button class="filt-btn on" onclick="setFilter('all')" id="filt-all">👥 全員</button>
+      <button class="filt-btn" onclick="setFilter('me')" id="filt-me">👤 自分</button>
+    </div>
+  </div>
   <div class="card">
     <div class="cn"><button class="ca" onclick="chMonth(-1)">◀</button><div class="cm" id="calLabel"></div><button class="ca" onclick="chMonth(1)">▶</button></div>
     <div class="cg" id="calGrid"></div>
@@ -332,7 +334,7 @@ function saveFileData(){
 function pad(n){ return String(n).padStart(2,"0"); }
 
 // ===== グローバル =====
-var lang="ja", curPg="home", calY=2026, calM=4, selDate=null, modalMode="", schedIdCounter=100;
+var lang="ja", curPg="home", calY=2026, calM=4, selDate=null, modalMode="", schedIdCounter=100, schedFilter="all";
 var todayD=new Date();
 var todayStr=todayD.getFullYear()+"-"+pad(todayD.getMonth()+1)+"-"+pad(todayD.getDate());
 
@@ -435,6 +437,48 @@ function setLang(l){
   renderAll(); if(selDate) renderDayDetail(selDate);
 }
 
+function setFilter(f){
+  schedFilter=f;
+  document.querySelectorAll(".filt-btn").forEach(function(b){ b.classList.remove("on"); });
+  var btn=document.getElementById("filt-"+f);
+  if(btn) btn.classList.add("on");
+  renderCal();
+  if(selDate) renderDayDetail(selDate);
+}
+function buildDeptFilters(){
+  var depts={};
+  staff.forEach(function(s){ depts[s.dept]=true; });
+  var container=document.getElementById("schedFilter");
+  // 既存ボタン以外を削除
+  var btns=container.querySelectorAll(".filt-btn");
+  btns.forEach(function(b,i){ if(i>1) b.remove(); });
+  // 部署ボタン追加
+  Object.keys(depts).forEach(function(dept){
+    var id="filt-dept-"+dept;
+    if(!document.getElementById(id)){
+      var btn=document.createElement("button");
+      btn.className="filt-btn"; btn.id=id; btn.textContent="🏢 "+dept;
+      btn.onclick=(function(d){ return function(){ setFilter("dept:"+d); }; })(dept);
+      container.appendChild(btn);
+    }
+  });
+}
+function getFilteredSched(ds){
+  var data=getFilteredSched(ds);
+  if(schedFilter==="all") return data;
+  if(schedFilter==="me") return data.filter(function(s){
+    return !s.member||s.member===""||s.member==="全員"||s.member.indexOf(hUser.name)>=0;
+  });
+  if(schedFilter.indexOf("dept:")===0){
+    var dept=schedFilter.slice(5);
+    var deptMembers=staff.filter(function(s){ return s.dept===dept; }).map(function(s){ return s.name; });
+    return data.filter(function(s){
+      if(!s.member||s.member==="全員") return true;
+      return deptMembers.some(function(nm){ return s.member.indexOf(nm)>=0; });
+    });
+  }
+  return data;
+}
 function showPage(pg){
   document.querySelectorAll(".pg").forEach(function(p){ p.classList.remove("on"); });
   document.querySelectorAll(".nb2").forEach(function(b){ b.classList.remove("on"); });
@@ -485,15 +529,28 @@ function staffOpts(){
   return o;
 }
 
+function deptOpts2(){
+  var depts={};
+  staff.forEach(function(s){ depts[s.dept]=true; });
+  var o="";
+  Object.keys(depts).forEach(function(d){ o+="<option value='dept:"+d+"'>🏢 "+d+"（全員）</option>"; });
+  return o;
+}
 function openAddSched(){
   modalMode="sched";
   var d=selDate||todayStr;
+  var memberSel="<option value=''>"+t("plSelect")+"</option>"+
+    "<option value='全員'>👥 全員</option>"+
+    deptOpts2()+
+    "<optgroup label='個人で選択'>"+
+    staff.map(function(s){ return "<option value='"+s.name+"'>"+s.name+" ("+s.dept+")</option>"; }).join("")+
+    "</optgroup>";
   openModal(t("addSchedT"),
     "<div class='fg'><label class='fl'>"+t("dateLbl")+"</label><input class='fi' type='date' id='fdate' value='"+d+"'></div>"+
     "<div class='tr'><div class='fg'><label class='fl'>"+t("startLbl")+"</label><select class='fi' id='fstart'>"+timeOpts("09:00")+"</select></div>"+
     "<div class='fg'><label class='fl'>"+t("endLbl")+"</label><select class='fi' id='fend'>"+timeOpts("10:00")+"</select></div></div>"+
     "<div class='fg'><label class='fl'>"+t("contentLbl")+"</label><input class='fi' id='ftitle' placeholder='"+t("plContent")+"'></div>"+
-    "<div class='fg'><label class='fl'>"+t("memberLbl")+"</label><select class='fi' id='fmember'>"+staffOpts()+"</select></div>"
+    "<div class='fg'><label class='fl'>参加メンバー（名簿・部署・全員）</label><select class='fi' id='fmember' size='1'>"+memberSel+"</select></div>"
   );
 }
 function openAddBoard(){
@@ -576,7 +633,14 @@ function submitModal(){
     if(st>=en){ showToast(t("timeErr")); return; }
     if(!schedData[d]) schedData[d]=[];
     schedIdCounter++;
-    schedData[d].push({id:schedIdCounter,st:st,et:en,title:ti,member:mb});
+    // 部署選択の場合はメンバー名を展開
+    var memberStr=mb;
+    if(mb && mb.indexOf("dept:")===0){
+      var dept=mb.slice(5);
+      var names=staff.filter(function(s){ return s.dept===dept; }).map(function(s){ return s.name; });
+      memberStr=names.join("、");
+    }
+    schedData[d].push({id:schedIdCounter,st:st,et:en,title:ti,member:memberStr});
     schedData[d].sort(function(a,b){ return a.st>b.st?1:-1; });
     saveData();
     if(!dbReady){ if(selDate===d) renderDayDetail(d); renderCal(); renderTodaySlots(); updateDots(); }
@@ -692,7 +756,7 @@ function renderCal(){
       else if(off) cls+=" od";
       else if(dow===6) cls+=" sat wd";
       else cls+=" wd";
-      if(schedData[ds]&&schedData[ds].length) cls+=" hs";
+      if(getFilteredSched(ds).length) cls+=" hs";
       var el=document.createElement("div"); el.className=cls; el.textContent=d;
       el.onclick=(function(ds){ return function(){ selectDay(ds); }; })(ds);
       grid.appendChild(el);
@@ -938,6 +1002,7 @@ function renderAll(){
 loadUser();
 applyUser();
 renderAll();
+buildDeptFilters();
 // Firebase SDKロード後に初期化
 window.addEventListener('load', function(){
   initFirebase();
