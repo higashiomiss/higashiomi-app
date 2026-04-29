@@ -151,7 +151,7 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
     <div class="sr">
       <div class="sb"><div class="sn" style="color:var(--gold)" id="unreadCnt">0</div><div class="sl" id="l-unread">未読メッセージ</div></div>
       <div class="sb"><div class="sn" id="todayCnt">0</div><div class="sl" id="l-today">今日の予定</div></div>
-      <div class="sb"><div class="sn" style="color:var(--gr)">30</div><div class="sl" id="l-staff2">スタッフ数</div></div>
+      <div class="sb"><div class="sn" style="color:var(--gr)" id="staffCountNum">30</div><div class="sl" id="l-staff2">スタッフ数</div></div>
     </div>
   </div>
   <div class="card">
@@ -742,7 +742,7 @@ function submitModal(){
         if(extras.length>0) memberStr=mb+"、"+extras.join("、");
       }
     }
-    schedData[d].push({id:schedIdCounter,st:st,et:en,title:ti,member:memberStr});
+    schedData[d].push({id:schedIdCounter,st:st,et:en,title:ti,member:memberStr,poster:hUser.name});
     schedData[d].sort(function(a,b){ return a.st>b.st?1:-1; });
     saveData();
     if(!dbReady){ if(selDate===d) renderDayDetail(d); renderCal(); renderTodaySlots(); updateDots(); }
@@ -1032,7 +1032,8 @@ function renderDayDetail(ds){
       var orig=title+(member?" 担当: "+member:"");
       translateText(orig, orig);
     }; })(s.title, s.member);
-    row.innerHTML="<div class='tt'>"+timeStr+"</div><div class='tb'><div class='tc'><div style='font-weight:600;font-size:15px'>"+s.title+"</div>"+mid+"</div></div>";
+    var poster=s.poster?"<div style='font-size:11px;color:var(--sub);margin-top:2px'>📝 "+s.poster+"</div>":"";
+    row.innerHTML="<div class='tt'>"+timeStr+"</div><div class='tb'><div class='tc'><div style='font-weight:600;font-size:15px'>"+s.title+"</div>"+mid+poster+"</div></div>";
     var tb=row.querySelector(".tb");
     tb.appendChild(transBtn2);
     tb.appendChild(editBtn);
@@ -1079,17 +1080,20 @@ function renderBoard(){
     var nb=isUnread?"<span class='bb'>"+t("newBadge")+"</span>":"";
     // ✅既読ボタンを下部に配置、他のボタンを右上に
     var topBtns=document.createElement("div");
-    topBtns.style.cssText="position:absolute;top:8px;right:8px;display:flex;gap:4px;align-items:center";
-    transBtn.style.cssText="background:#e8f0fb;border:1px solid #b5d4f4;border-radius:4px;color:var(--navy);font-size:12px;cursor:pointer;padding:3px 5px";
-    editBtn.style.cssText="background:none;border:none;color:#aaa;font-size:15px;cursor:pointer;padding:0 2px;line-height:1";
-    delBtn.style.cssText="background:none;border:none;color:#ccc;font-size:17px;cursor:pointer;padding:0 2px;line-height:1";
+    topBtns.style.cssText="display:flex;gap:5px;align-items:center;margin-top:8px;justify-content:flex-end";
+    transBtn.style.cssText="background:#e8f0fb;border:1px solid #b5d4f4;border-radius:5px;color:var(--navy);font-size:12px;cursor:pointer;padding:3px 7px";
+    editBtn.style.cssText="background:#f5f5f5;border:1px solid #ddd;border-radius:5px;color:#aaa;font-size:13px;cursor:pointer;padding:3px 7px";
+    delBtn.style.cssText="background:#fff0f0;border:1px solid #f8caca;border-radius:5px;color:var(--red);font-size:13px;cursor:pointer;padding:3px 7px";
     topBtns.appendChild(transBtn); topBtns.appendChild(editBtn); topBtns.appendChild(delBtn);
     // ✅ボタンは本文下に配置
     readBtn.style.cssText="background:"+(isUnread?"#e8f5ee":"#f5f5f5")+";border:1.5px solid "+(isUnread?"#2a7a4a":"#ccc")+";border-radius:6px;color:"+(isUnread?"#2a7a4a":"#999")+";font-size:12px;cursor:pointer;padding:4px 10px;margin-top:6px;font-family:inherit";
     readBtn.textContent=isUnread?"✅ 既読にする":"☑ 既読済み";
-    el.innerHTML="<div style='font-weight:600;font-size:15px;margin-bottom:2px'>"+b.title+nb+"</div><div style='font-size:14px;color:#444;margin-top:2px;line-height:1.6'>"+b.body+"</div><div class='ba' style='margin-top:4px'>"+b.author+" ・ "+b.time+"</div>";
-    el.appendChild(topBtns);
-    el.appendChild(readBtn);
+    var bottomRow=document.createElement("div");
+    bottomRow.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-top:7px;gap:6px";
+    bottomRow.appendChild(readBtn);
+    bottomRow.appendChild(topBtns);
+    el.innerHTML="<div style='font-weight:600;font-size:15px;margin-bottom:3px'>"+b.title+nb+"</div><div style='font-size:14px;color:#444;line-height:1.6'>"+b.body+"</div><div class='ba' style='margin-top:3px'>"+b.author+" ・ "+b.time+"</div>";
+    el.appendChild(bottomRow);
     list.appendChild(el);
   });
 }
@@ -1219,6 +1223,10 @@ function updateFileNotice(){
   });
 }
 
+function updateStaffCount(){
+  var el=document.getElementById("staffCountNum");
+  if(el) el.textContent=staff.length;
+}
 function renderStaff(data){
   var grid=document.getElementById("staffGrid"); grid.innerHTML="";
   var colors=["#1a3a7a","#2a5ab5","#e8a020","#2a7a4a","#8a2020","#6a2a8a","#1a6a7a"];
@@ -1246,7 +1254,8 @@ function renderTodaySlots(){
     var row=document.createElement("div"); row.className="tw";
     var timeStr=s.st+(s.et?" ～ "+s.et:"");
     var mid=s.member?"<div style='font-size:12px;color:var(--sub);margin-top:2px'>👤 "+s.member+"</div>":"";
-    row.innerHTML="<div class='tt'>"+timeStr+"</div><div class='tb'><div class='tc'><div style='font-weight:600;font-size:15px'>"+s.title+"</div>"+mid+"</div></div>";
+    var poster=s.poster?"<div style='font-size:11px;color:var(--sub);margin-top:2px'>📝 "+s.poster+"</div>":"";
+    row.innerHTML="<div class='tt'>"+timeStr+"</div><div class='tb'><div class='tc'><div style='font-weight:600;font-size:15px'>"+s.title+"</div>"+mid+poster+"</div></div>";
     c.appendChild(row);
   });
 }
@@ -1317,7 +1326,7 @@ function reloadAll(){
 }
 function renderAll(){
   renderCal(); renderBoard(); renderHomeBoard(); renderSurveys(); renderStaff(staff); renderTodaySlots(); renderFiles();
-  updateDots(); updateFileNotice();
+  updateDots(); updateFileNotice(); updateStaffCount();
 }
 
 // ===== 初期化 =====
