@@ -47,8 +47,9 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 .cd{min-height:44px;display:flex;align-items:flex-start;justify-content:flex-start;border-radius:7px;cursor:pointer;font-size:13px;position:relative;padding:3px 2px;flex-direction:column}
 .cd.today{background:var(--navy)!important;color:#fff!important;font-weight:700}
 .cd.sel{background:var(--gold)!important;color:#fff!important}
-.cd.sat{color:#1a5ab5}.cd.wd{background:#f0f8f4}
-.cd.od{background:#fef6f6;color:var(--red)}.cd.em{cursor:default;background:transparent!important}
+.cd.wd{background:#ddf0fa;color:#1a2744}
+.cd.od{background:#fddde5;color:#1a2744}
+.cd.em{cursor:default;background:transparent!important}
 .cd.hs::after{content:'';position:absolute;bottom:3px;width:5px;height:5px;background:var(--gold);border-radius:50%}
 .cd.today.hs::after,.cd.sel.hs::after{background:#fff}
 .cl{display:flex;gap:12px;margin-top:9px;flex-wrap:wrap}
@@ -106,11 +107,12 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 .vbtn{background:#f0f4ff;border:1.5px solid var(--bd);border-radius:20px;padding:7px 0;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;color:var(--sub);flex:1;text-align:center}
 .vbtn.on{background:var(--navy);color:#fff;border-color:var(--navy)}
 .cal-chip{display:block;font-size:8px;background:var(--navy);color:#fff;border-radius:3px;padding:1px 3px;margin-top:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:1.5;max-width:100%}
-.wk-row{background:#f9fbff;border-radius:10px;margin-bottom:8px;overflow:hidden;border:0.5px solid var(--bd)}
-.wk-dh{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f0f4fb;cursor:pointer}
-.wk-dn{font-size:13px;font-weight:700;color:var(--navy)}.wk-dn.is-today{background:var(--navy);color:#fff;border-radius:8px;padding:2px 8px}.wk-dn.is-off{color:var(--red)}
-.wk-cnt{font-size:11px;color:var(--sub)}.wk-ev{padding:4px 12px 8px}.wk-noev{font-size:12px;color:#ccc;padding:6px 0 2px}
-.wk-item{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:0.5px solid #eef;cursor:pointer}.wk-item:last-child{border-bottom:none}
+.wk-row{border-radius:10px;margin-bottom:8px;overflow:hidden;border:0.5px solid var(--bd)}
+.wk-row.wk-off{background:#fddde5}.wk-row.wk-work{background:#ddf0fa}
+.wk-dh{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(0,0,0,0.04);cursor:pointer}
+.wk-dn{font-size:13px;font-weight:700;color:var(--navy)}.wk-dn.is-today{background:var(--navy);color:#fff;border-radius:8px;padding:2px 8px}
+.wk-cnt{font-size:11px;color:var(--sub)}.wk-ev{padding:4px 12px 8px}.wk-noev{font-size:12px;color:#aaa;padding:6px 0 2px}
+.wk-item{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,0.06);cursor:pointer}.wk-item:last-child{border-bottom:none}
 .wk-bar{width:4px;border-radius:2px;align-self:stretch;min-height:38px;flex-shrink:0}.wk-info{flex:1;min-width:0}
 .wk-time{font-size:11px;color:var(--sub);font-weight:500}.wk-title{font-size:13px;font-weight:700;color:#1a1a2e;margin:2px 0}.wk-meta{font-size:11px;color:var(--sub);line-height:1.6}
 </style>
@@ -210,8 +212,8 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
     <div id="calMonthWrap">
       <div class="cg" id="calGrid"></div>
       <div class="cl">
-        <div class="li"><div class="lb2" style="background:#f0f8f4;border:1px solid #cde"></div><span>出勤日</span></div>
-        <div class="li"><div class="lb2" style="background:#fef6f6;border:1px solid #f8caca"></div><span>休日</span></div>
+        <div class="li"><div class="lb2" style="background:#ddf0fa;border:1px solid #9bd0f0"></div><span>出勤日</span></div>
+        <div class="li"><div class="lb2" style="background:#fddde5;border:1px solid #f8a0b8"></div><span>休日</span></div>
         <div class="li"><div class="lb2" style="background:var(--navy)"></div><span>今日</span></div>
         <div class="li"><div style="width:9px;height:9px;border-radius:50%;background:var(--gold);flex-shrink:0"></div><span>予定あり</span></div>
       </div>
@@ -1008,13 +1010,10 @@ function renderCal(){
   var wc=0,oc=0;
   for(var dd=1;dd<=total;dd++){
     (function(d){
-      var ds=calY+"-"+pad(calM)+"-"+pad(d), off=isOff(ds);
+      var ds=calY+"-"+pad(calM)+"-"+pad(d);
+      var off=isOff(ds);
       if(off) oc++; else wc++;
-      var cls="cd";
-      if(ds===todayStr) cls+=" today";
-      else if(ds===selDate) cls+=" sel";
-      else if(off) cls+=" od";
-      else cls+=" wd";
+      var cls="cd " + (ds===todayStr?"today":ds===selDate?"sel":off?"od":"wd");
       var dayEvs=getFilteredSched(ds);
       if(dayEvs.length) cls+=" hs";
       var el=document.createElement("div"); el.className=cls;
@@ -1055,10 +1054,11 @@ function renderWeekView(){
     var ds=dt.getFullYear()+"-"+pad(dt.getMonth()+1)+"-"+pad(dt.getDate());
     var off2=isOff(ds), isToday2=(ds===todayStr);
     var dayLabel=(dt.getMonth()+1)+"月"+dt.getDate()+"日\uff08"+dowJa[dt.getDay()]+"\uff09";
-    var dnCls="wk-dn"+(isToday2?" is-today":off2?" is-off":"");
+    var dnCls="wk-dn"+(isToday2?" is-today":"");
+    var rowBg=off2?"wk-off":"wk-work";
     var evs=getFilteredSched(ds);
     var cntTxt=evs.length?"<span class='wk-cnt'>"+evs.length+"件</span>":"";
-    html+="<div class='wk-row'>";
+    html+="<div class='wk-row "+rowBg+"'>";
     html+="<div class='wk-dh' onclick='selectDay(\""+ds+"\")' >";
     html+="<span class='"+dnCls+"'>" +dayLabel+"</span>"+cntTxt+"</div>";
     html+="<div class='wk-ev'>";
@@ -1068,8 +1068,7 @@ function renderWeekView(){
       var lines2=[]; if(s.poster) lines2.push("📝 "+s.poster); if(s.member) lines2.push("👥 "+s.member);
       html+="<div class='wk-item' onclick='selectDay(\""+ds+"\")' >";
       html+="<div class='wk-bar' style='background:"+col+"'></div>";
-      html+="<div class='wk-info'>";
-      html+="<div class='wk-time'>"+s.st+(s.et?" 〜 "+s.et:"")+"</div>";
+      html+="<div class='wk-info'><div class='wk-time'>"+s.st+(s.et?" 〜 "+s.et:"")+"</div>";
       html+="<div class='wk-title'>"+s.title+"</div>";
       if(lines2.length) html+="<div class='wk-meta'>"+lines2.join("　")+"</div>";
       html+="</div></div>";
