@@ -225,9 +225,7 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
       </div>
       <div class="cs" id="calSum"></div>
     </div>
-    <div id="calWeekWrap" style="display:none">
-      <div id="weekGrid"></div>
-    </div>
+    <div id="calWeekWrap" style="display:none"><div id="weekGrid"></div></div>
   </div>
   <div class="card" id="dayCard" style="display:none">
     <div class="shd">
@@ -664,16 +662,16 @@ function openAddSched(){
   var memberChecks=staff.map(function(s){
     return "<label style='display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid #eef;cursor:pointer'>"+
       "<input type='checkbox' class='fmember-cb' value='"+s.name+"' style='width:17px;height:17px;accent-color:var(--navy);flex-shrink:0'>"+
-      "<span style='font-size:13px'>"+s.name+" <span style='font-size:11px;color:var(--sub)'>("+s.dept+")</span></span></label>";
+      "<span style='font-size:13px'>"+s.name+"<span style='font-size:11px;color:var(--sub)'> ("+s.dept+")</span></span></label>";
   }).join("");
   openModal(t("addSchedT"),
     "<div class='fg'><label class='fl'>"+t("dateLbl")+"</label><input class='fi' type='date' id='fdate' value='"+d+"'></div>"+
     "<div class='tr'><div class='fg'><label class='fl'>"+t("startLbl")+"</label><select class='fi' id='fstart'>"+timeOpts("09:00")+"</select></div>"+
     "<div class='fg'><label class='fl'>"+t("endLbl")+"</label><select class='fi' id='fend'>"+timeOpts("10:00")+"</select></div></div>"+
     "<div class='fg'><label class='fl'>"+t("contentLbl")+"</label><input class='fi' id='ftitle' placeholder='"+t("plContent")+"'></div>"+
-    "<div class='fg'><label class='fl' style='margin-bottom:3px'>📝 投稿者</label>"+
+    "<div class='fg'><label class='fl' style='margin-bottom:4px'>📝 投稿者</label>"+
     "<div style='background:#f0f4ff;border-radius:8px;padding:9px 12px;font-size:14px;font-weight:600;color:var(--navy)'>"+hUser.name+"</div></div>"+
-    "<div class='fg'><label class='fl' style='margin-bottom:6px'>👥 参加メンバー <span style='font-size:11px;color:var(--sub);font-weight:400'>（任意・複数選択可）</span></label>"+
+    "<div class='fg'><label class='fl' style='margin-bottom:6px'>👥 参加メンバー <span style='font-size:11px;color:var(--sub);font-weight:400'>（任意・複数OK）</span></label>"+
     "<div style='max-height:160px;overflow-y:auto;border:0.5px solid var(--bd);border-radius:8px;padding:4px 10px'>"+memberChecks+"</div></div>"
   );
 }
@@ -781,7 +779,6 @@ function submitModal(){
     if(st>=en){ showToast(t("timeErr")); return; }
     if(!schedData[d]) schedData[d]=[];
     schedIdCounter++;
-    // チェックボックスから参加メンバー取得（任意）
     var checked=document.querySelectorAll(".fmember-cb:checked");
     var memberStr=Array.from(checked).map(function(cb){ return cb.value; }).join("、");
     schedData[d].push({id:schedIdCounter,st:st,et:en,title:ti,member:memberStr,poster:hUser.name});
@@ -1035,14 +1032,18 @@ function renderCal(){
       var dayEvs=getFilteredSched(ds);
       if(dayEvs.length) cls+=" hs";
       var el=document.createElement("div"); el.className=cls;
+      // 日付番号
       var numDiv=document.createElement("div");
       numDiv.style.cssText="font-size:12px;font-weight:700;text-align:center;line-height:1.8";
       numDiv.textContent=d;
       el.appendChild(numDiv);
+      // 投稿者名チップ（最大2件）
       dayEvs.slice(0,2).forEach(function(s){
         var nm=(s.poster||"").split(" ")[0]||"";
         if(!nm) return;
-        var chip=document.createElement("span"); chip.className="cal-chip"; chip.textContent=nm;
+        var chip=document.createElement("span");
+        chip.className="cal-chip";
+        chip.textContent=nm;
         el.appendChild(chip);
       });
       if(dayEvs.length>2){
