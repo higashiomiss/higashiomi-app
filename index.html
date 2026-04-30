@@ -108,19 +108,11 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 .cal-chip{display:block;font-size:8px;background:var(--navy);color:#fff;border-radius:3px;padding:1px 3px;margin-top:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:1.5;max-width:100%}
 .wk-row{background:#f9fbff;border-radius:10px;margin-bottom:8px;overflow:hidden;border:0.5px solid var(--bd)}
 .wk-dh{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f0f4fb;cursor:pointer}
-.wk-dn{font-size:13px;font-weight:700;color:var(--navy)}
-.wk-dn.is-today{background:var(--navy);color:#fff;border-radius:8px;padding:2px 8px}
-.wk-dn.is-off{color:var(--red)}
-.wk-cnt{font-size:11px;color:var(--sub)}
-.wk-ev{padding:4px 12px 8px}
-.wk-noev{font-size:12px;color:#ccc;padding:6px 0 2px}
-.wk-item{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:0.5px solid #eef;cursor:pointer}
-.wk-item:last-child{border-bottom:none}
-.wk-bar{width:4px;border-radius:2px;align-self:stretch;min-height:38px;flex-shrink:0}
-.wk-info{flex:1;min-width:0}
-.wk-time{font-size:11px;color:var(--sub);font-weight:500}
-.wk-title{font-size:13px;font-weight:700;color:#1a1a2e;margin:2px 0}
-.wk-meta{font-size:11px;color:var(--sub);line-height:1.6}
+.wk-dn{font-size:13px;font-weight:700;color:var(--navy)}.wk-dn.is-today{background:var(--navy);color:#fff;border-radius:8px;padding:2px 8px}.wk-dn.is-off{color:var(--red)}
+.wk-cnt{font-size:11px;color:var(--sub)}.wk-ev{padding:4px 12px 8px}.wk-noev{font-size:12px;color:#ccc;padding:6px 0 2px}
+.wk-item{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:0.5px solid #eef;cursor:pointer}.wk-item:last-child{border-bottom:none}
+.wk-bar{width:4px;border-radius:2px;align-self:stretch;min-height:38px;flex-shrink:0}.wk-info{flex:1;min-width:0}
+.wk-time{font-size:11px;color:var(--sub);font-weight:500}.wk-title{font-size:13px;font-weight:700;color:#1a1a2e;margin:2px 0}.wk-meta{font-size:11px;color:var(--sub);line-height:1.6}
 </style>
 </head>
 <body>
@@ -209,10 +201,10 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
       <button class="filt-btn" onclick="setFilter('me')" id="filt-me">👤 自分</button>
     </div>
   </div>
-  <div class="card">
+    <div class="card">
     <div class="vbtn-wrap">
-      <button class="vbtn on" id="vbtn-month" onclick="setCalView('month')">📅 月表示</button>
-      <button class="vbtn" id="vbtn-week" onclick="setCalView('week')">📋 週表示</button>
+      <button class="vbtn on" id="vbtn-month" onclick="setCalView('month')">&#128197; 月表示</button>
+      <button class="vbtn" id="vbtn-week" onclick="setCalView('week')">&#128203; 週表示</button>
     </div>
     <div class="cn"><button class="ca" onclick="chPeriod(-1)">◀</button><div class="cm" id="calLabel"></div><button class="ca" onclick="chPeriod(1)">▶</button></div>
     <div id="calMonthWrap">
@@ -226,6 +218,7 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
       <div class="cs" id="calSum"></div>
     </div>
     <div id="calWeekWrap" style="display:none"><div id="weekGrid"></div></div>
+  </div>
   </div>
   <div class="card" id="dayCard" style="display:none">
     <div class="shd">
@@ -430,8 +423,8 @@ var todayD=new Date();
 var todayStr=todayD.getFullYear()+"-"+pad(todayD.getMonth()+1)+"-"+pad(todayD.getDate());
 
 // ===== 工場カレンダー =====
-var FHOL=["2026-05-04","2026-05-05","2026-05-06","2026-07-20","2026-08-10","2026-08-11","2026-08-12","2026-08-13","2026-08-14","2026-09-21","2026-09-23","2026-10-12","2026-12-28","2026-12-29","2026-12-30","2026-12-31","2027-01-01","2027-01-02","2027-01-03","2027-01-11"];
-function isOff(ds){ var dow=new Date(ds+"T00:00:00").getDay(); return FHOL.indexOf(ds)>=0||dow===0||dow===6; }
+var FHOL=["2026-04-05","2026-04-11","2026-04-12","2026-04-19","2026-04-26","2026-04-29","2026-04-30","2026-05-01","2026-05-02","2026-05-03","2026-05-04","2026-05-05","2026-05-06","2026-05-09","2026-05-10","2026-05-16","2026-05-17","2026-05-23","2026-05-24","2026-05-31","2026-06-06","2026-06-07","2026-06-13","2026-06-14","2026-06-20","2026-06-21","2026-06-27","2026-06-28","2026-07-04","2026-07-05","2026-07-11","2026-07-12","2026-07-18","2026-07-19","2026-07-20","2026-07-25","2026-07-26","2026-08-02","2026-08-08","2026-08-09","2026-08-10","2026-08-11","2026-08-12","2026-08-13","2026-08-14","2026-08-15","2026-08-16","2026-08-22","2026-08-23","2026-08-29","2026-08-30","2026-09-05","2026-09-06","2026-09-12","2026-09-13","2026-09-19","2026-09-20","2026-09-21","2026-09-22","2026-09-23","2026-09-27","2026-10-03","2026-10-04","2026-10-10","2026-10-11","2026-10-12","2026-10-17","2026-10-18","2026-10-24","2026-10-25","2026-11-01","2026-11-03","2026-11-08","2026-11-14","2026-11-15","2026-11-22","2026-11-23","2026-11-28","2026-11-29","2026-12-05","2026-12-06","2026-12-12","2026-12-13","2026-12-19","2026-12-20","2026-12-26","2026-12-27","2026-12-28","2026-12-29","2026-12-30","2026-12-31","2027-01-01","2027-01-02","2027-01-03","2027-01-04","2027-01-05","2027-01-10","2027-01-11","2027-01-17","2027-01-23","2027-01-24","2027-01-31","2027-02-06","2027-02-07","2027-02-11","2027-02-14","2027-02-20","2027-02-21","2027-02-23","2027-02-28","2027-03-06","2027-03-07","2027-03-13","2027-03-14","2027-03-20","2027-03-21","2027-03-27","2027-03-28"];
+function isOff(ds){ return FHOL.indexOf(ds)>=0; }
 
 // ===== スタッフ =====
 var staff=[
@@ -657,24 +650,23 @@ function onMemberSel(){
   }
 }
 function openAddSched(){
-  modalMode="sched";
-  var d=selDate||todayStr;
-  var memberChecks=staff.map(function(s){
-    return "<label style='display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid #eef;cursor:pointer'>"+
-      "<input type='checkbox' class='fmember-cb' value='"+s.name+"' style='width:17px;height:17px;accent-color:var(--navy);flex-shrink:0'>"+
-      "<span style='font-size:13px'>"+s.name+"<span style='font-size:11px;color:var(--sub)'> ("+s.dept+")</span></span></label>";
-  }).join("");
-  openModal(t("addSchedT"),
-    "<div class='fg'><label class='fl'>"+t("dateLbl")+"</label><input class='fi' type='date' id='fdate' value='"+d+"'></div>"+
-    "<div class='tr'><div class='fg'><label class='fl'>"+t("startLbl")+"</label><select class='fi' id='fstart'>"+timeOpts("09:00")+"</select></div>"+
-    "<div class='fg'><label class='fl'>"+t("endLbl")+"</label><select class='fi' id='fend'>"+timeOpts("10:00")+"</select></div></div>"+
-    "<div class='fg'><label class='fl'>"+t("contentLbl")+"</label><input class='fi' id='ftitle' placeholder='"+t("plContent")+"'></div>"+
-    "<div class='fg'><label class='fl' style='margin-bottom:4px'>📝 投稿者</label>"+
-    "<div style='background:#f0f4ff;border-radius:8px;padding:9px 12px;font-size:14px;font-weight:600;color:var(--navy)'>"+hUser.name+"</div></div>"+
-    "<div class='fg'><label class='fl' style='margin-bottom:6px'>👥 参加メンバー <span style='font-size:11px;color:var(--sub);font-weight:400'>（任意・複数OK）</span></label>"+
-    "<div style='max-height:160px;overflow-y:auto;border:0.5px solid var(--bd);border-radius:8px;padding:4px 10px'>"+memberChecks+"</div></div>"
+  modalMode='sched'; var d=selDate||todayStr;
+  var mc=staff.map(function(s){
+    return '<label style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid #eef;cursor:pointer">'+
+      '<input type="checkbox" class="fmember-cb" value="'+s.name+'" style="width:17px;height:17px;accent-color:var(--navy);flex-shrink:0">'+
+      '<span style="font-size:13px">'+s.name+'<span style="font-size:11px;color:var(--sub)"> ('+s.dept+')</span></span></label>';
+  }).join('');
+  openModal(t('addSchedT'),
+    '<div class="fg"><label class="fl">'+t('dateLbl')+'</label><input class="fi" type="date" id="fdate" value="'+d+'"></div>'+
+    '<div class="tr"><div class="fg"><label class="fl">'+t('startLbl')+'</label><select class="fi" id="fstart">'+timeOpts('09:00')+'</select></div>'+
+    '<div class="fg"><label class="fl">'+t('endLbl')+'</label><select class="fi" id="fend">'+timeOpts('10:00')+'</select></div></div>'+
+    '<div class="fg"><label class="fl">'+t('contentLbl')+'</label><input class="fi" id="ftitle" placeholder="'+t('plContent')+'"></div>'+
+    '<div class="fg"><label class="fl" style="margin-bottom:4px">📝 投稿者</label><div style="background:#f0f4ff;border-radius:8px;padding:9px 12px;font-size:14px;font-weight:600;color:var(--navy)">'+hUser.name+'</div></div>'+
+    '<div class="fg"><label class="fl" style="margin-bottom:6px">👥 参加メンバー <span style="font-size:11px;color:var(--sub);font-weight:400">（任意・複数OK）</span></label>'+
+    '<div style="max-height:160px;overflow-y:auto;border:0.5px solid var(--bd);border-radius:8px;padding:4px 10px">'+mc+'</div></div>'
   );
 }
+
 function openAddBoard(){
   modalMode="board";
   openModal(t("addBoardT"),
@@ -1022,40 +1014,28 @@ function renderCal(){
   var wc=0,oc=0;
   for(var dd=1;dd<=total;dd++){
     (function(d){
-      var ds=calY+"-"+pad(calM)+"-"+pad(d), dow=new Date(calY,calM-1,d).getDay(), off=isOff(ds);
+      var ds=calY+"-"+pad(calM)+"-"+pad(d), off=isOff(ds);
       if(off) oc++; else wc++;
       var cls="cd";
       if(ds===todayStr) cls+=" today";
       else if(ds===selDate) cls+=" sel";
       else if(off) cls+=" od";
-      else if(dow===6) cls+=" sat wd";
       else cls+=" wd";
       var dayEvs=getFilteredSched(ds);
       if(dayEvs.length) cls+=" hs";
       var el=document.createElement("div"); el.className=cls;
-      // 日付番号
       var numDiv=document.createElement("div");
       numDiv.style.cssText="font-size:12px;font-weight:700;text-align:center;line-height:1.8";
-      numDiv.textContent=d;
-      el.appendChild(numDiv);
-      // 名前チップ: poster→member→title の優先順で表示（最大2件）
+      numDiv.textContent=d; el.appendChild(numDiv);
       dayEvs.slice(0,2).forEach(function(s){
         var nm="";
         if(s.poster) nm=s.poster.split(" ")[0];
         else if(s.member) nm=s.member.split("、")[0].split(" ")[0];
         else if(s.title) nm=s.title.slice(0,4);
         if(!nm) return;
-        var chip=document.createElement("span");
-        chip.className="cal-chip";
-        chip.textContent=nm;
-        el.appendChild(chip);
+        var chip=document.createElement("span"); chip.className="cal-chip"; chip.textContent=nm; el.appendChild(chip);
       });
-      if(dayEvs.length>2){
-        var more=document.createElement("span");
-        more.style.cssText="font-size:8px;color:var(--sub);display:block;text-align:center";
-        more.textContent="+"+(dayEvs.length-2);
-        el.appendChild(more);
-      }
+      if(dayEvs.length>2){ var more=document.createElement("span"); more.style.cssText="font-size:8px;color:var(--sub);display:block;text-align:center"; more.textContent="+"+(dayEvs.length-2); el.appendChild(more); }
       el.onclick=(function(ds){ return function(){ selectDay(ds); }; })(ds);
       grid.appendChild(el);
     })(dd);
@@ -1066,84 +1046,69 @@ function renderCal(){
 }
 var WK_COLS=["#1a3a7a","#2a7a4a","#8a2020","#6a2a8a","#1a6a7a","#c07010","#1a6a3a","#7a3a1a"];
 function renderWeekView(){
-  var now=new Date();
-  var sun=new Date(now); sun.setDate(now.getDate()-now.getDay()+weekOffset*7);
+  var now=new Date(); var sun=new Date(now); sun.setDate(now.getDate()-now.getDay()+weekOffset*7);
   var sat=new Date(sun); sat.setDate(sun.getDate()+6);
-  function fmtMD(dt){ return (dt.getMonth()+1)+"月"+dt.getDate()+"日"; }
-  document.getElementById("calLabel").textContent=sun.getFullYear()+"年 "+fmtMD(sun)+" 〜 "+fmtMD(sat);
-  var dowJa=["日","月","火","水","木","金","土"];
-  var html="";
+  function fmtMD(dt){ return (dt.getMonth()+1)+'月'+dt.getDate()+'日'; }
+  document.getElementById('calLabel').textContent=sun.getFullYear()+'年 '+fmtMD(sun)+' 〜 '+fmtMD(sat);
+  var dowJa=['日','月','火','水','木','金','土']; var html='';
   for(var i=0;i<7;i++){
     var dt=new Date(sun); dt.setDate(sun.getDate()+i);
-    var ds=dt.getFullYear()+"-"+pad(dt.getMonth()+1)+"-"+pad(dt.getDate());
-    var dow=dt.getDay(), off=isOff(ds), isToday=(ds===todayStr);
-    var dayLabel=(dt.getMonth()+1)+"月"+dt.getDate()+"日（"+dowJa[dow]+"）";
-    var dnCls="wk-dn"+(isToday?" is-today":off?" is-off":"");
+    var ds=dt.getFullYear()+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate());
+    var off2=isOff(ds), isToday2=(ds===todayStr);
+    var dayLabel=(dt.getMonth()+1)+'月'+dt.getDate()+'日\uff08'+dowJa[dt.getDay()]+'\uff09';
+    var dnCls='wk-dn'+(isToday2?' is-today':off2?' is-off':'');
     var evs=getFilteredSched(ds);
-    var cntTxt=evs.length?"<span class='wk-cnt'>"+evs.length+"件</span>":"";
-    html+="<div class='wk-row'>";
-    html+="<div class='wk-dh' onclick='selectDay(\""+ds+"\")'><span class='"+dnCls+"'>"+dayLabel+"</span>"+cntTxt+"</div>";
-    html+="<div class='wk-ev'>";
+    var cntTxt=evs.length?'<span class="wk-cnt">'+evs.length+'件</span>':'';
+    html+='<div class="wk-row">';
+    html+='<div class="wk-dh" onclick="selectDay(\"'+ds+'\")"><span class="'+dnCls+'">'+dayLabel+'</span>'+cntTxt+'</div>';
+    html+='<div class="wk-ev">';
     if(!evs.length){
-      html+="<div class='wk-noev'>予定なし</div>";
+      html+='<div class="wk-noev">予定なし</div>';
     } else {
       evs.forEach(function(s,si){
         var col=WK_COLS[si%WK_COLS.length];
-        var lines=[];
-        if(s.poster) lines.push("📝 "+s.poster);
-        if(s.member) lines.push("👥 "+s.member);
-        html+="<div class='wk-item' onclick='selectDay(\""+ds+"\")'>";
-        html+="<div class='wk-bar' style='background:"+col+"'></div>";
-        html+="<div class='wk-info'>";
-        html+="<div class='wk-time'>"+s.st+(s.et?" ～ "+s.et:"")+"</div>";
-        html+="<div class='wk-title'>"+s.title+"</div>";
-        if(lines.length) html+="<div class='wk-meta'>"+lines.join("　")+"</div>";
-        html+="</div></div>";
+        var lines2=[];
+        if(s.poster) lines2.push('📝 '+s.poster);
+        if(s.member) lines2.push('👥 '+s.member);
+        html+='<div class="wk-item" onclick="selectDay(\"'+ds+'\")">'+
+          '<div class="wk-bar" style="background:'+col+'"></div>'+
+          '<div class="wk-info">'+
+          '<div class="wk-time">'+s.st+(s.et?' 〜 '+s.et:'')+'</div>'+
+          '<div class="wk-title">'+s.title+'</div>'+
+          (lines2.length?'<div class="wk-meta">'+lines2.join('　')+'</div>':'')+
+          '</div></div>';
       });
     }
-    html+="</div></div>";
+    html+='</div></div>';
   }
-  document.getElementById("weekGrid").innerHTML=html;
+  document.getElementById('weekGrid').innerHTML=html;
 }
-function setCalView(v){
-  calView=v;
-  document.getElementById("vbtn-month").classList.toggle("on",v==="month");
-  document.getElementById("vbtn-week").classList.toggle("on",v==="week");
-  document.getElementById("calMonthWrap").style.display=v==="month"?"block":"none";
-  document.getElementById("calWeekWrap").style.display=v==="week"?"block":"none";
-  renderCal();
-}
-function chPeriod(dir){
-  if(calView==="month"){ calM+=dir; if(calM>12){calM=1;calY++;} if(calM<1){calM=12;calY--;} }
-  else { weekOffset+=dir; }
-  renderCal();
-}
+function setCalView(v){ calView=v; document.getElementById("vbtn-month").classList.toggle("on",v==="month"); document.getElementById("vbtn-week").classList.toggle("on",v==="week"); document.getElementById("calMonthWrap").style.display=v==="month"?"block":"none"; document.getElementById("calWeekWrap").style.display=v==="week"?"block":"none"; renderCal(); }
+function chPeriod(dir){ if(calView==="month"){ calM+=dir; if(calM>12){calM=1;calY++;} if(calM<1){calM=12;calY--;} } else { weekOffset+=dir; } renderCal(); }
 function chMonth(dir){ chPeriod(dir); }
 function selectDay(ds){ selDate=ds; renderCal(); renderDayDetail(ds); document.getElementById("defCard").style.display="none"; document.getElementById("dayCard").style.display="block"; }
 function openEditSched(ds, id){
   var data=schedData[ds]||[];
   var s=data.find(function(x){ return x.id===id; }); if(!s) return;
-  modalMode="editsched";
-  var existingMembers=(s.member||"").split("、").map(function(n){ return n.trim(); }).filter(Boolean);
-  var memberChecks=staff.map(function(st2){
-    var isChecked=existingMembers.indexOf(st2.name)>=0;
-    return "<label style='display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid #eef;cursor:pointer'>"+
-      "<input type='checkbox' class='femember-cb' value='"+st2.name+"'"+(isChecked?" checked":"")+
-      " style='width:17px;height:17px;accent-color:var(--navy);flex-shrink:0'>"+
-      "<span style='font-size:13px'>"+st2.name+"<span style='font-size:11px;color:var(--sub)'> ("+st2.dept+")</span></span></label>";
-  }).join("");
-  document.getElementById("modalTitle").textContent="✏ 予定を編集";
-  document.getElementById("modalBody").innerHTML=
-    "<input type='hidden' id='feschedds' value='"+ds+"'>"+
-    "<input type='hidden' id='feschedid' value='"+id+"'>"+
-    "<div class='fg'><label class='fl'>"+t("startLbl")+"</label><select class='fi' id='festart'>"+timeOpts(s.st)+"</select></div>"+
-    "<div class='fg'><label class='fl'>"+t("endLbl")+"</label><select class='fi' id='feend'>"+timeOpts(s.et||"10:00")+"</select></div>"+
-    "<div class='fg'><label class='fl'>"+t("contentLbl")+"</label><input class='fi' id='fetitle' value='"+s.title+"'></div>"+
-    "<div class='fg'><label class='fl' style='margin-bottom:4px'>📝 投稿者</label>"+
-    "<div style='background:#f0f4ff;border-radius:8px;padding:9px 12px;font-size:14px;font-weight:600;color:var(--navy)'>"+(s.poster||hUser.name)+"</div></div>"+
-    "<div class='fg'><label class='fl' style='margin-bottom:6px'>👥 参加メンバー <span style='font-size:11px;color:var(--sub);font-weight:400'>（任意・複数OK）</span></label>"+
-    "<div style='max-height:160px;overflow-y:auto;border:0.5px solid var(--bd);border-radius:8px;padding:4px 10px'>"+memberChecks+"</div></div>";
-  document.getElementById("modal").classList.add("on");
+  modalMode='editsched';
+  var existing=(s.member||'').split('、').map(function(n){ return n.trim(); }).filter(Boolean);
+  var mc=staff.map(function(st2){
+    var chk=existing.indexOf(st2.name)>=0;
+    return '<label style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid #eef;cursor:pointer">'+
+      '<input type="checkbox" class="femember-cb" value="'+st2.name+'"'+(chk?' checked':'')+' style="width:17px;height:17px;accent-color:var(--navy);flex-shrink:0">'+
+      '<span style="font-size:13px">'+st2.name+'<span style="font-size:11px;color:var(--sub)"> ('+st2.dept+')</span></span></label>';
+  }).join('');
+  document.getElementById('modalTitle').textContent='✏ 予定を編集';
+  document.getElementById('modalBody').innerHTML=
+    '<input type="hidden" id="feschedds" value="'+ds+'">'+
+    '<input type="hidden" id="feschedid" value="'+id+'">'+
+    '<div class="fg"><label class="fl">'+t('startLbl')+'</label><select class="fi" id="festart">'+timeOpts(s.st)+'</select></div>'+
+    '<div class="fg"><label class="fl">'+t('endLbl')+'</label><select class="fi" id="feend">'+timeOpts(s.et||'10:00')+'</select></div>'+
+    '<div class="fg"><label class="fl">'+t('contentLbl')+'</label><input class="fi" id="fetitle" value="'+s.title+'"></div>'+
+    '<div class="fg"><label class="fl" style="margin-bottom:4px">📝 投稿者</label><div style="background:#f0f4ff;border-radius:8px;padding:9px 12px;font-size:14px;font-weight:600;color:var(--navy)">'+(s.poster||hUser.name)+'</div></div>'+
+    '<div class="fg"><label class="fl" style="margin-bottom:6px">👥 参加メンバー <span style="font-size:11px;color:var(--sub);font-weight:400">（任意・複数OK）</span></label>'+
+    '<div style="max-height:160px;overflow-y:auto;border:0.5px solid var(--bd);border-radius:8px;padding:4px 10px">'+mc+'</div></div>';
+  document.getElementById('modal').classList.add('on');
 }
 function renderDayDetail(ds){
   var parts=ds.split("-");
