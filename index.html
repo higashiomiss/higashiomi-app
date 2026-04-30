@@ -776,12 +776,10 @@ function submitModal(){
     var ti=document.getElementById("ftitle").value.trim();
     var st=document.getElementById("fstart").value;
     var en=document.getElementById("fend").value;
-    var mb=document.getElementById("fmember").value;
     if(!ti){ showToast(t("needContent")); return; }
     if(st>=en){ showToast(t("timeErr")); return; }
     if(!schedData[d]) schedData[d]=[];
     schedIdCounter++;
-    // メンバー処理
     var checked=document.querySelectorAll(".fmember-cb:checked");
     var memberStr=Array.from(checked).map(function(cb){ return cb.value; }).join("、");
     schedData[d].push({id:schedIdCounter,st:st,et:en,title:ti,member:memberStr,poster:hUser.name});
@@ -1040,9 +1038,12 @@ function renderCal(){
       numDiv.style.cssText="font-size:12px;font-weight:700;text-align:center;line-height:1.8";
       numDiv.textContent=d;
       el.appendChild(numDiv);
-      // 投稿者名チップ（最大2件）
+      // 名前チップ: poster→member→title の優先順で表示（最大2件）
       dayEvs.slice(0,2).forEach(function(s){
-        var nm=(s.poster||"").split(" ")[0]||"";
+        var nm="";
+        if(s.poster) nm=s.poster.split(" ")[0];
+        else if(s.member) nm=s.member.split("、")[0].split(" ")[0];
+        else if(s.title) nm=s.title.slice(0,4);
         if(!nm) return;
         var chip=document.createElement("span");
         chip.className="cal-chip";
@@ -1052,7 +1053,7 @@ function renderCal(){
       if(dayEvs.length>2){
         var more=document.createElement("span");
         more.style.cssText="font-size:8px;color:var(--sub);display:block;text-align:center";
-        more.textContent="+"+( dayEvs.length-2);
+        more.textContent="+"+(dayEvs.length-2);
         el.appendChild(more);
       }
       el.onclick=(function(ds){ return function(){ selectDay(ds); }; })(ds);
@@ -1067,8 +1068,8 @@ var WK_COLS=["#1a3a7a","#2a7a4a","#8a2020","#6a2a8a","#1a6a7a","#c07010","#1a6a3
 function renderWeekView(){
   var now=new Date();
   var sun=new Date(now); sun.setDate(now.getDate()-now.getDay()+weekOffset*7);
-  function fmtMD(dt){ return (dt.getMonth()+1)+"月"+dt.getDate()+"日"; }
   var sat=new Date(sun); sat.setDate(sun.getDate()+6);
+  function fmtMD(dt){ return (dt.getMonth()+1)+"月"+dt.getDate()+"日"; }
   document.getElementById("calLabel").textContent=sun.getFullYear()+"年 "+fmtMD(sun)+" 〜 "+fmtMD(sat);
   var dowJa=["日","月","火","水","木","金","土"];
   var html="";
