@@ -348,11 +348,9 @@ function listenAll(){
     if(v && v.content){
       rulesData=v;
       var el=document.getElementById("rulesContent");
-      if(el) el.textContent=v.content;
-    } else {
-      var el=document.getElementById("rulesContent");
-      if(el) el.textContent="就業規則はまだ登録されていません。";
+      if(el) el.innerHTML=v.content;
     }
+    // Firebaseにデータがない場合はHTMLを上書きしない
   });
   db.ref("fileData").on("value", function(snap){
     var v = snap.val();
@@ -1355,16 +1353,14 @@ function clearInitData(){
   showToast("サンプルデータを削除しました。自分が追加したデータも消えました");
 }
 // ===== 就業規則 =====
-var rulesData = {content:""};
+var rulesData = {content:"就業規則を読み込み中..."};
 function loadRules(){
   if(db){
     db.ref("rulesData").on("value", function(snap){
       var v=snap.val();
       if(v && v.content){
         rulesData=v;
-        document.getElementById("rulesContent").textContent=v.content;
-      } else {
-        document.getElementById("rulesContent").textContent="就業規則はまだ登録されていません。管理者が編集ボタンから登録できます。";
+        document.getElementById("rulesContent").innerHTML=v.content;
       }
     });
   }
