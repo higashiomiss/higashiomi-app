@@ -28,9 +28,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:#f5f5f5;font-size:15px;mar
 .lbtn{background:rgba(255,255,255,0.15);border:none;border-radius:5px;color:#fff;padding:4px 8px;font-size:11px;cursor:pointer;font-family:inherit}
 .lbtn.on{background:var(--gold)}
 nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.1)}
-.nb2{flex:1;padding:6px 2px 7px;background:none;border:none;color:rgba(255,255,255,0.6);font-size:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;border-bottom:3px solid transparent;font-family:inherit}
+.nb2{flex:1;padding:10px 2px 8px;background:none;border:none;color:rgba(255,255,255,0.6);font-size:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;border-bottom:3px solid transparent;font-family:inherit}
 .nb2.on{color:#fff;border-bottom-color:var(--gold);background:rgba(255,255,255,0.08)}
-.ni{font-size:19px}
+.ni{font-size:22px}
 .ct{flex:1;padding:11px}
 .pg{display:none}.pg.on{display:block}
 .card{background:#fff;border-radius:12px;border:0.5px solid var(--bd);padding:13px;margin-bottom:11px}
@@ -105,32 +105,25 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 .filt-btn.on{background:var(--navy);color:#fff;border-color:var(--navy)}
 
 /* PC対応 */
+/* ===== PC対応 ===== */
 @media(min-width:768px){
   .app{max-width:100%}
   .hdr{padding:12px 32px}
+  .bw{display:none}
   nav{display:none!important}
   .pc-tabs{display:flex!important}
   .card{padding:18px 28px;margin-bottom:14px}
   .sr{grid-template-columns:1fr 1fr 1fr}
+  .sg{grid-template-columns:repeat(4,1fr)}
   .pg.on{padding:16px 32px 24px;max-width:1000px;margin:0 auto}
-  .fab{display:none!important}
-}
-  .hdr{padding:12px 32px}
-  nav{display:none!important}
-  .pc-tabs{display:flex!important}
-  .card{padding:18px 28px;margin-bottom:14px}
-  .sr{grid-template-columns:1fr 1fr 1fr}
-  .sg{grid-template-columns:repeat(5,1fr)}
-  .pg.on{padding:16px 24px 24px;max-width:960px;margin:0 auto}
   .fab{display:none!important}
 }
 @media(max-width:767px){
   .pc-tabs{display:none!important}
   .pg.on{padding-bottom:80px}
 }
-/* PC タブ */
-.pc-tabs{display:none;background:var(--navy);border-top:1px solid rgba(255,255,255,0.12)}
-.pc-tab{flex:1;padding:10px 6px;background:none;border:none;color:rgba(255,255,255,0.65);font-size:13px;cursor:pointer;font-family:inherit;border-bottom:3px solid transparent;transition:all 0.2s;font-weight:500}
+.pc-tabs{display:none;background:var(--navy);border-top:1px solid rgba(255,255,255,0.15)}
+.pc-tab{flex:1;padding:10px 4px;background:none;border:none;color:rgba(255,255,255,0.6);font-size:12px;cursor:pointer;font-family:inherit;border-bottom:3px solid transparent;font-weight:500;white-space:nowrap}
 .pc-tab:hover{color:#fff;background:rgba(255,255,255,0.08)}
 .pc-tab.on{color:#fff;border-bottom-color:var(--gold);background:rgba(255,255,255,0.1)}
 </style>
@@ -163,13 +156,13 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
   <button class="pc-tab" id="pt-staff" onclick="showPage('staff')">👥 名簿</button>
 </div>
 <nav>
-  <button class="nb2 on" id="n-home" onclick="showPage('home')"><span class="ni">🏠</span><span>ホーム</span></button>
-  <button class="nb2" id="n-schedule" onclick="showPage('schedule')"><span class="ni">📅</span><span>スケジュール</span></button>
-  <button class="nb2" id="n-board" onclick="showPage('board')"><span class="ni">📋</span><span>伝言板</span></button>
-  <button class="nb2" id="n-survey" onclick="showPage('survey')"><span class="ni">📊</span><span>アンケート</span></button>
-  <button class="nb2" id="n-rules" onclick="showPage('rules')"><span class="ni">📜</span><span>就業規則</span></button>
-  <button class="nb2" id="n-files" onclick="showPage('files')"><span class="ni">📎</span><span>ファイル</span></button>
-  <button class="nb2" id="n-staff" onclick="showPage('staff')"><span class="ni">👥</span><span>名簿</span></button>
+  <button class="nb2 on" id="n-home" onclick="showPage('home')"><span class="ni">🏠</span></button>
+  <button class="nb2" id="n-schedule" onclick="showPage('schedule')"><span class="ni">📅</span></button>
+  <button class="nb2" id="n-board" onclick="showPage('board')"><span class="ni">📋</span></button>
+  <button class="nb2" id="n-survey" onclick="showPage('survey')"><span class="ni">📊</span></button>
+  <button class="nb2" id="n-rules" onclick="showPage('rules')"><span class="ni">📜</span></button>
+  <button class="nb2" id="n-files" onclick="showPage('files')"><span class="ni">📎</span></button>
+  <button class="nb2" id="n-staff" onclick="showPage('staff')"><span class="ni">👥</span></button>
 </nav>
 <div class="ct">
 
