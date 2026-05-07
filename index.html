@@ -211,13 +211,6 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 </div>
 
 <div class="pg" id="pg-schedule">
-  <div class="card" style="padding:10px">
-    <div style="font-size:12px;color:var(--sub);margin-bottom:6px;font-weight:500">📋 表示するスケジュール</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap" id="schedFilter">
-      <button class="filt-btn on" onclick="setFilter('all')" id="filt-all">👥 全員</button>
-      <button class="filt-btn" onclick="setFilter('me')" id="filt-me">👤 自分</button>
-    </div>
-  </div>
   <div class="card">
     <div class="cn"><button class="ca" onclick="chMonth(-1)">◀</button><div class="cm" id="calLabel"></div><button class="ca" onclick="chMonth(1)">▶</button></div>
     <div class="cg" id="calGrid"></div>
@@ -246,7 +239,15 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
   </div>
 </div>
 
-<div class="pg" id="pg-board">
+<div class="pg" 
+  <div class="card" style="padding:10px">
+    <div style="font-size:12px;color:var(--sub);margin-bottom:6px;font-weight:500">📋 表示するスケジュール</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap" id="schedFilter">
+      <button class="filt-btn on" onclick="setFilter('all')" id="filt-all">👥 全員</button>
+      <button class="filt-btn" onclick="setFilter('me')" id="filt-me">👤 自分</button>
+    </div>
+  </div>
+id="pg-board">
   <div class="shd"><div style="font-size:17px;font-weight:700">📋 伝言板</div><button class="btn bsm bg" onclick="openAddBoard()">＋ 投稿</button></div>
   <div id="boardList"></div>
 </div>
@@ -1451,6 +1452,12 @@ function updateDots(){
   var sDot=document.getElementById("sDot"); sDot.textContent=todayCount; sDot.style.display=todayCount>0?"flex":"none";
   document.getElementById("todayCnt").textContent=todayCount;
   document.getElementById("unreadCnt").textContent=newCount;
+  // ホーム画面バッジ更新（PWA対応）
+  var totalBadge = newCount + todayCount;
+  if(navigator.setAppBadge){
+    if(totalBadge > 0){ navigator.setAppBadge(totalBadge); }
+    else { navigator.clearAppBadge(); }
+  }
 }
 
 function clearAllData(){
