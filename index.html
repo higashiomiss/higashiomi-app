@@ -924,6 +924,17 @@ function delBoard(id){
   renderBoard(); renderHomeBoard(); updateDots();
   showToast(t("deleted"));
 }
+function markRead(id){
+  var b=boardData.find(function(x){ return x.id===id||parseInt(x.id)===id; });
+  if(!b) return;
+  if(!b.readBy) b.readBy=[];
+  if(!Array.isArray(b.readBy)) b.readBy=Object.values(b.readBy);
+  if(b.readBy.indexOf(hUser.name)>=0){ return; } // すでに既読
+  b.readBy.push(hUser.name);
+  saveData();
+  renderBoard(); renderHomeBoard(); updateDots();
+  showToast("既読にしました");
+}
 function delSurv(id){
   if(!confirm(t("delSurv"))) return;
   survData=survData.filter(function(s){ return s.id!==id && parseInt(s.id)!==id; });
