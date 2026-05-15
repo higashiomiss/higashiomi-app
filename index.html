@@ -348,7 +348,22 @@ function listenAll(){
   if(!db) return;
   db.ref("schedData").on("value", function(snap){
     var v = snap.val();
-    if(v) schedData = v;
+    if(v){
+      schedData = v;
+      // 既存IDの最大値からカウンターを設定（ID重複防止）
+      var maxId = schedIdCounter;
+      Object.keys(schedData).forEach(function(ds){
+        var arr = schedData[ds];
+        if(!arr) return;
+        var items = Array.isArray(arr) ? arr : Object.values(arr);
+        items.forEach(function(item){
+          if(item && item.id && parseInt(item.id) > maxId){
+            maxId = parseInt(item.id);
+          }
+        });
+      });
+      schedIdCounter = maxId;
+    }
     renderCal(); renderTodaySlots(); updateDots();
     if(selDate) renderDayDetail(selDate);
   });
@@ -786,10 +801,14 @@ function submitModal(){
     var raw2=schedData[ds]||[];
     var data=Array.isArray(raw2)?raw2:Object.values(raw2);
     data=data.filter(function(x){ return x&&x.id!==undefined; });
+    // インデックスを優先、なければIDで検索
+    var savedIdx=document.getElementById("feschedidx")?parseInt(document.getElementById("feschedidx").value):-1;
     var sidx=-1;
-    for(var i=0;i<data.length;i++){
-      if(String(data[i].id)===String(id)){
-        sidx=i; break;
+    if(savedIdx>=0 && savedIdx<data.length && String(data[savedIdx].id)===String(id)){
+      sidx=savedIdx; // インデックスとIDが一致すればそれを使用
+    } else {
+      for(var i=0;i<data.length;i++){
+        if(String(data[i].id)===String(id)){ sidx=i; break; }
       }
     }
     if(sidx<0){ showToast("予定が見つかりません"); return; }
@@ -822,7 +841,7 @@ function submitModal(){
     if(!ti){ showToast(t("needContent")); return; }
     if(st>=en){ showToast(t("timeErr")); return; }
     if(!schedData[d]) schedData[d]=[];
-    schedIdCounter++;
+    schedIdCounter = Math.max(schedIdCounter + 1, Date.now() % 1000000);
     // メンバー処理
     var memberStr=mb;
     if(mb && mb.indexOf("dept:")===0){
@@ -1234,25 +1253,29 @@ function renderCal(){
 function chMonth(dir){ calM+=dir; if(calM>12){calM=1;calY++;} if(calM<1){calM=12;calY--;} renderCal(); }
 function selectDay(ds){ selDate=ds; renderCal(); renderDayDetail(ds); document.getElementById("defCard").style.display="none"; document.getElementById("dayCard").style.display="block"; }
 function openEditSched(ds, id){
-  // schedData[ds]をArrayに変換（Firebaseがオブジェクトで返す場合も対応）
+  // schedData[ds]をArrayに変換
   var raw=schedData[ds]||[];
   var data=Array.isArray(raw)?raw:Object.values(raw);
   data=data.filter(function(x){ return x&&x.id!==undefined; });
-  // IDは文字列比較で確実に一致させる
-  var s=data.find(function(x){ return String(x.id)===String(id); });
-  if(!s){ showToast("予定が見つかりません"); return; }
+  // IDとインデックスの両方で一致確認
+  var sidx=-1;
+  for(var i=0;i<data.length;i++){
+    if(String(data[i].id)===String(id)){ sidx=i; break; }
+  }
+  if(sidx<0){ showToast("予定が見つかりません(id="+id+")"); return; }
+  var s=data[sidx];
   modalMode="editsched";
   document.getElementById("modalTitle").textContent="✏ 予定を編集";
-  // 日付フィールドを追加
+  // ds,id,インデックスをすべて保存して確実に一致させる
   document.getElementById("modalBody").innerHTML=
     "<input type='hidden' id='feschedds' value='"+ds+"'>"+
-    "<input type='hidden' id='feschedid' value='"+id+"'>"+
+    "<input type='hidden' id='feschedid' value='"+String(s.id)+"'>"+
+    "<input type='hidden' id='feschedidx' value='"+sidx+"'>"+
     "<div class='fg'><label class='fl'>📅 日付</label><input type='date' class='fi' id='fescheddate' value='"+ds+"'></div>"+
     "<div class='fg'><label class='fl'>"+t("startLbl")+"</label><select class='fi' id='festart'>"+timeOpts(s.st)+"</select></div>"+
     "<div class='fg'><label class='fl'>"+t("endLbl")+"</label><select class='fi' id='feend'>"+timeOpts(s.et||"10:00")+"</select></div>"+
     "<div class='fg'><label class='fl'>"+t("contentLbl")+"</label><input class='fi' id='fetitle' value='"+s.title.replace(/'/g,"&#39;")+"'></div>"+
     "<div class='fg'><label class='fl'>"+t("memberLbl")+"</label><select class='fi' id='femember'>"+staffOpts()+"</select></div>";
-  // 担当者を選択状態に
   setTimeout(function(){
     var sel=document.getElementById("femember");
     if(sel && s.member){ sel.value=s.member; }
@@ -1269,7 +1292,10 @@ function renderDayDetail(ds){
   var raw=schedData[ds]||[];
   var data=Array.isArray(raw)?raw:Object.values(raw);
   data=data.filter(function(x){ return x&&x.id!==undefined; });
-  data.sort(function(a,b){ return (a.st||"")>(b.st||"")?1:-1; });
+  data.sort(function(a,b){
+    if((a.st||"")!==(b.st||"")) return (a.st||"")>(b.st||"")?1:-1;
+    return String(a.id)>String(b.id)?1:-1; // 同時間はID順（追加順）
+  });
   if(!data.length){ slots.innerHTML=""; noEl.style.display="block"; return; }
   noEl.style.display="none"; slots.innerHTML="";
   data.forEach(function(s){
