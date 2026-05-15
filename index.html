@@ -793,7 +793,17 @@ function submitModal(){
     var ti=document.getElementById("fetitle").value.trim();
     var st=document.getElementById("festart").value;
     var en=document.getElementById("feend").value;
-    var mb=document.getElementById("femember").value;
+    // 担当者をチェックボックスから取得（複数対応）
+    var mb;
+    var allCb=document.getElementById("fmAll");
+    if(allCb && allCb.checked){
+      mb="全員";
+    } else {
+      var cbs=document.querySelectorAll(".fmCb:checked");
+      var names=Array.from(cbs).map(function(c){ return c.value; });
+      mb=names.join("、");
+    }
+    if(mb===undefined||mb===null) mb=document.getElementById("femember")?document.getElementById("femember").value:"";
     if(!ti){ showToast(t("needContent")); return; }
     if(st>=en){ showToast(t("timeErr")); return; }
     if(!newDs){ showToast("日付を選択してください"); return; }
@@ -825,23 +835,32 @@ function submitModal(){
     if(sidx<0){ showToast("予定が見つかりません"); return; }
     var s=data[sidx];
     if(newDs!==ds){
-      // 日付が変わる場合：元の日付から削除して新しい日付に追加
+      // 日付変更：元の日付から削除して新しい日付に追加
       var moved={id:s.id,st:st,et:en,title:ti,member:mb,poster:s.poster||hUser.name};
       data.splice(sidx,1);
-      if(!schedData[ds]||!schedData[ds].length) delete schedData[ds];
-      if(!schedData[newDs]) schedData[newDs]=[];
-      schedData[newDs].push(moved);
-      schedData[newDs].sort(function(a,b){ return a.st>b.st?1:-1; });
+      // schedData[ds]を更新（配列として確実に保存）
+      if(data.length===0){
+        delete schedData[ds];
+      } else {
+        schedData[ds]=data;
+      }
+      // 新しい日付に追加
+      var newRaw=schedData[newDs]||[];
+      var newData=Array.isArray(newRaw)?newRaw:Object.values(newRaw);
+      newData=newData.filter(function(x){ return x&&x.id!==undefined; });
+      newData.push(moved);
+      newData.sort(function(a,b){ return a.st>b.st?1:-1; });
+      schedData[newDs]=newData;
     } else {
-      // 同じ日付の場合：そのまま更新
-      s.st=st; s.et=en; s.title=ti; s.member=mb;
+      // 同じ日付：更新してschedData[ds]に書き戻す
+      data[sidx]={id:s.id,st:st,et:en,title:ti,member:mb,poster:s.poster||hUser.name};
       data.sort(function(a,b){ return a.st>b.st?1:-1; });
+      schedData[ds]=data;
     }
     saveData();
-    if(!dbReady){
-      renderDayDetail(newDs); renderDayDetail(ds);
-      renderCal(); renderTodaySlots();
-    }
+    renderDayDetail(newDs);
+    if(ds!==newDs) renderDayDetail(ds);
+    renderCal(); renderTodaySlots();
     showToast(t("updated"));
   } else if(modalMode==="sched"){
     var d=document.getElementById("fdate").value;
@@ -1267,26 +1286,37 @@ function openEditSched(ds, id){
   openEditSchedDirect(ds, {id:id});
 }
 function openEditSchedDirect(ds, sobj){
-  // sobj には id,st,et,title,member,poster が入っている
-  // ただしidのみの場合はFirebaseから再取得
   var id = sobj.id;
   var raw=schedData[ds]||[];
   var data=Array.isArray(raw)?raw:Object.values(raw);
   data=data.filter(function(x){ return x&&x.id!==undefined; });
-  // sobj.stがある（renderDayDetailから呼ばれた）場合はそのまま使う
   var s;
   if(sobj.st!==undefined){
-    s=sobj; // renderDayDetailから渡されたオブジェクトをそのまま使用
+    s=sobj;
   } else {
-    // IDで検索（後方互換）
     s=data.find(function(x){ return String(x.id)===String(id); });
     if(!s){ showToast("予定が見つかりません"); return; }
   }
-  // Firebase保存時のインデックスを取得（保存用）
   var sidx=-1;
   for(var i=0;i<data.length;i++){
     if(String(data[i].id)===String(s.id)){ sidx=i; break; }
   }
+  // 現在の担当者を配列に変換（「、」区切り）
+  var curMembers=[];
+  if(s.member && s.member!=="全員"){
+    curMembers=s.member.split("、").map(function(n){ return n.trim(); }).filter(function(n){ return n; });
+  }
+  var isAll=(s.member==="全員");
+  // 担当者チェックボックスリストを生成
+  var cbHtml="<div style='max-height:160px;overflow-y:auto;border:1px solid #dde3ef;border-radius:8px;padding:8px;background:#f8faff'>";
+  cbHtml+="<label style='display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer'>";
+  cbHtml+="<input type='checkbox' id='fmAll' value='全員' style='width:15px;height:15px'"+(isAll?" checked":"")+" onchange='_editAllToggle(this)'> 全員</label>";
+  staff.forEach(function(st2){
+    var chk=curMembers.indexOf(st2.name)>=0?" checked":"";
+    cbHtml+="<label style='display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer'>";
+    cbHtml+="<input type='checkbox' class='fmCb' value='"+st2.name+"' style='width:15px;height:15px'"+chk+"> "+st2.name+" <span style='color:#888;font-size:11px'>("+st2.dept+")</span></label>";
+  });
+  cbHtml+="</div>";
   modalMode="editsched";
   document.getElementById("modalTitle").textContent="✏ 予定を編集";
   document.getElementById("modalBody").innerHTML=
@@ -1297,12 +1327,12 @@ function openEditSchedDirect(ds, sobj){
     "<div class='fg'><label class='fl'>"+t("startLbl")+"</label><select class='fi' id='festart'>"+timeOpts(s.st)+"</select></div>"+
     "<div class='fg'><label class='fl'>"+t("endLbl")+"</label><select class='fi' id='feend'>"+timeOpts(s.et||"10:00")+"</select></div>"+
     "<div class='fg'><label class='fl'>"+t("contentLbl")+"</label><input class='fi' id='fetitle' value='"+(s.title||"").replace(/'/g,"&#39;")+"'></div>"+
-    "<div class='fg'><label class='fl'>"+t("memberLbl")+"</label><select class='fi' id='femember'>"+staffOpts()+"</select></div>";
-  setTimeout(function(){
-    var sel=document.getElementById("femember");
-    if(sel && s.member){ sel.value=s.member; }
-  },50);
+    "<div class='fg'><label class='fl'>👥 担当者</label>"+cbHtml+"</div>";
   document.getElementById("modal").classList.add("on");
+}
+function _editAllToggle(el){
+  var cbs=document.querySelectorAll(".fmCb");
+  cbs.forEach(function(cb){ cb.checked=false; cb.disabled=el.checked; });
 }
 function renderDayDetail(ds){
   var parts=ds.split("-");
