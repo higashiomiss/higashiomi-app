@@ -801,14 +801,25 @@ function submitModal(){
     var raw2=schedData[ds]||[];
     var data=Array.isArray(raw2)?raw2:Object.values(raw2);
     data=data.filter(function(x){ return x&&x.id!==undefined; });
-    // インデックスを優先、なければIDで検索
-    var savedIdx=document.getElementById("feschedidx")?parseInt(document.getElementById("feschedidx").value):-1;
+    // インデックスを優先（インデックスとIDが一致する場合）
     var sidx=-1;
+    var savedIdxEl=document.getElementById("feschedidx");
+    var savedIdx=savedIdxEl?parseInt(savedIdxEl.value):-1;
     if(savedIdx>=0 && savedIdx<data.length && String(data[savedIdx].id)===String(id)){
-      sidx=savedIdx; // インデックスとIDが一致すればそれを使用
-    } else {
+      sidx=savedIdx;
+    }
+    if(sidx<0){
+      // IDで検索（インデックスが合わない場合）
       for(var i=0;i<data.length;i++){
         if(String(data[i].id)===String(id)){ sidx=i; break; }
+      }
+    }
+    if(sidx<0){
+      // 最終手段：タイトルと時間で一致するものを探す
+      var ti_chk=document.getElementById("fetitle").value.trim();
+      var st_chk=document.getElementById("festart").value;
+      for(var j=0;j<data.length;j++){
+        if(data[j].title===ti_chk && data[j].st===st_chk){ sidx=j; break; }
       }
     }
     if(sidx<0){ showToast("予定が見つかりません"); return; }
@@ -1253,20 +1264,31 @@ function renderCal(){
 function chMonth(dir){ calM+=dir; if(calM>12){calM=1;calY++;} if(calM<1){calM=12;calY--;} renderCal(); }
 function selectDay(ds){ selDate=ds; renderCal(); renderDayDetail(ds); document.getElementById("defCard").style.display="none"; document.getElementById("dayCard").style.display="block"; }
 function openEditSched(ds, id){
-  // schedData[ds]をArrayに変換
+  openEditSchedDirect(ds, {id:id});
+}
+function openEditSchedDirect(ds, sobj){
+  // sobj には id,st,et,title,member,poster が入っている
+  // ただしidのみの場合はFirebaseから再取得
+  var id = sobj.id;
   var raw=schedData[ds]||[];
   var data=Array.isArray(raw)?raw:Object.values(raw);
   data=data.filter(function(x){ return x&&x.id!==undefined; });
-  // IDとインデックスの両方で一致確認
+  // sobj.stがある（renderDayDetailから呼ばれた）場合はそのまま使う
+  var s;
+  if(sobj.st!==undefined){
+    s=sobj; // renderDayDetailから渡されたオブジェクトをそのまま使用
+  } else {
+    // IDで検索（後方互換）
+    s=data.find(function(x){ return String(x.id)===String(id); });
+    if(!s){ showToast("予定が見つかりません"); return; }
+  }
+  // Firebase保存時のインデックスを取得（保存用）
   var sidx=-1;
   for(var i=0;i<data.length;i++){
-    if(String(data[i].id)===String(id)){ sidx=i; break; }
+    if(String(data[i].id)===String(s.id)){ sidx=i; break; }
   }
-  if(sidx<0){ showToast("予定が見つかりません(id="+id+")"); return; }
-  var s=data[sidx];
   modalMode="editsched";
   document.getElementById("modalTitle").textContent="✏ 予定を編集";
-  // ds,id,インデックスをすべて保存して確実に一致させる
   document.getElementById("modalBody").innerHTML=
     "<input type='hidden' id='feschedds' value='"+ds+"'>"+
     "<input type='hidden' id='feschedid' value='"+String(s.id)+"'>"+
@@ -1274,7 +1296,7 @@ function openEditSched(ds, id){
     "<div class='fg'><label class='fl'>📅 日付</label><input type='date' class='fi' id='fescheddate' value='"+ds+"'></div>"+
     "<div class='fg'><label class='fl'>"+t("startLbl")+"</label><select class='fi' id='festart'>"+timeOpts(s.st)+"</select></div>"+
     "<div class='fg'><label class='fl'>"+t("endLbl")+"</label><select class='fi' id='feend'>"+timeOpts(s.et||"10:00")+"</select></div>"+
-    "<div class='fg'><label class='fl'>"+t("contentLbl")+"</label><input class='fi' id='fetitle' value='"+s.title.replace(/'/g,"&#39;")+"'></div>"+
+    "<div class='fg'><label class='fl'>"+t("contentLbl")+"</label><input class='fi' id='fetitle' value='"+(s.title||"").replace(/'/g,"&#39;")+"'></div>"+
     "<div class='fg'><label class='fl'>"+t("memberLbl")+"</label><select class='fi' id='femember'>"+staffOpts()+"</select></div>";
   setTimeout(function(){
     var sel=document.getElementById("femember");
@@ -1306,7 +1328,7 @@ function renderDayDetail(ds){
     delBtn.onclick=(function(ds2,id){ return function(){ delSched(ds2,id); }; })(ds,s.id);
     var editBtn=document.createElement("button"); editBtn.className="db"; editBtn.textContent="✏";
     editBtn.style.cssText="background:none;border:none;color:#aaa;font-size:16px;cursor:pointer;padding:0 2px;flex-shrink:0;line-height:1";
-    editBtn.onclick=(function(ds2,sid){ return function(){ openEditSched(ds2,sid); }; })(ds,String(s.id));
+    editBtn.onclick=(function(ds2,sobj){ return function(){ openEditSchedDirect(ds2,sobj); }; })(ds,{id:s.id,st:s.st,et:s.et,title:s.title,member:s.member,poster:s.poster});
     var transBtn2=document.createElement("button"); transBtn2.textContent="🌐"; transBtn2.title="翻訳";
     transBtn2.style.cssText="background:#e8f0fb;border:1px solid #b5d4f4;border-radius:4px;color:var(--navy);font-size:12px;cursor:pointer;padding:2px 5px;flex-shrink:0";
     transBtn2.onclick=(function(title,member){ return function(){
