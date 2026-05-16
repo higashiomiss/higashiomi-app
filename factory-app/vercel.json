@@ -4,7 +4,7 @@
   "framework": "nextjs",
   "installCommand": "npm install",
   "env": {
-    "NEXT_PUBLIC_GAS_URL": "@gas_url",
-    "GAS_API_KEY": "@gas_api_key"
+    "NEXT_PUBLIC_GAS_URL": "https://example.com",
+    "GAS_API_KEY": "dummy"
   }
 }
