@@ -1082,10 +1082,22 @@ function delFile(id){
 function closeTransModal(){
   document.getElementById("transModal").classList.remove("on");
 }
+function _getTransCache(){
+  try{ return JSON.parse(localStorage.getItem("transCache")||"{}"); }catch(e){ return {}; }
+}
+function _saveTransCache(cache){
+  try{ localStorage.setItem("transCache", JSON.stringify(cache)); }catch(e){}
+}
 function showTransModal(original, text){
   document.getElementById("transOriginal").textContent = original;
-  document.getElementById("transResult").textContent = "翻訳中...";
   document.getElementById("transModal").classList.add("on");
+  // 前回翻訳した結果があればキャッシュから即表示（再取得しない）
+  var cache = _getTransCache();
+  if(cache[text]){
+    document.getElementById("transResult").textContent = cache[text];
+    return;
+  }
+  document.getElementById("transResult").textContent = "翻訳中...";
   // 長い文章は複数回に分けて翻訳
   var chunks = [];
   var maxLen = 400;
@@ -1102,7 +1114,9 @@ function showTransModal(original, text){
         results[idx] = d.responseStatus===200 ? d.responseData.translatedText : chunk;
         done++;
         if(done===chunks.length){
-          document.getElementById("transResult").textContent = results.join(" ");
+          var full = results.join(" ");
+          document.getElementById("transResult").textContent = full;
+          var c = _getTransCache(); c[text] = full; _saveTransCache(c);
         }
       })
       .catch(function(){
