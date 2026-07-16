@@ -1523,6 +1523,12 @@ function renderFiles(){
     var dlBtn=document.createElement("button"); dlBtn.className="fi-dl"; dlBtn.textContent="⬇ 開く・保存";
     dlBtn.onclick=(function(data,name){
       return function(){
+        var isPdf = data && data.indexOf("data:application/pdf")===0;
+        if(isPdf){
+          // PDFはBlobURL経由で開く（iPhone/Androidで確実に表示・保存できる）
+          openPdfModal(data,name);
+          return;
+        }
         // iPhoneはa.click()が効かないのでwindow.openを使う
         try{
           var w=window.open("","_blank");
