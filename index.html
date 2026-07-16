@@ -12,6 +12,7 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Noto Sans JP',sans-serif;background:#f5f5f5;font-size:15px;margin:0;padding:0}
@@ -476,6 +477,47 @@ var ADMIN_NAME="吉田 尚未"; // 管理者名
 var SAFETY_ADMINS=["吉田 尚未","近藤 竜二"]; // 安否確認を開始できる人
 var safetyData={active:false,responses:{}};
 var ACCESS_PIN_DEFAULT="1234"; // 初回のみ使う初期暗証番号（管理者は後で変更可能）
+
+// ===== プッシュ通知（安否確認アラート用） =====
+var VAPID_KEY="BFpSznDnsIyxGJu-lDbElVdaB7_kmFYDz6FXHd55m8JbTxWRHVpNnh5fwTzh_-yXZjHkYJuj_6VOZG64SS9Me3k";
+var NOTIFY_ENDPOINT="https://REPLACE-ME.vercel.app/api/send-notification"; // ← Vercelデプロイ後にこのURLを差し替える
+var NOTIFY_SECRET="563d307cc51e4115cefa7aa6f8dfe50f5010ebe4a7ff7160"; // Vercel側の環境変数 NOTIFY_SECRET と同じ値にする
+
+function requestNotifyPermission(){
+  if(!("serviceWorker" in navigator) || !("Notification" in window)){
+    showToast("この端末・ブラウザは通知に対応していません");
+    return;
+  }
+  Notification.requestPermission().then(function(perm){
+    if(perm!=="granted"){
+      showToast("通知が許可されませんでした");
+      return;
+    }
+    navigator.serviceWorker.register("firebase-messaging-sw.js").then(function(reg){
+      var messaging = firebase.messaging();
+      messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg }).then(function(token){
+        if(token && db){
+          db.ref("pushTokens/"+safeKey(hUser.name)).set(token);
+          showToast("🔔 通知を有効にしました");
+        } else {
+          showToast("通知の登録に失敗しました");
+        }
+      }).catch(function(err){
+        showToast("通知の登録でエラーが発生しました");
+      });
+    }).catch(function(){
+      showToast("Service Workerの登録に失敗しました");
+    });
+  });
+}
+function sendSafetyPush(title, body){
+  if(!NOTIFY_ENDPOINT || NOTIFY_ENDPOINT.indexOf("REPLACE-ME")>=0) return;
+  fetch(NOTIFY_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Notify-Secret": NOTIFY_SECRET },
+    body: JSON.stringify({ title: title, body: body })
+  }).catch(function(){});
+}
 
 // ===== アクセス制限（暗証番号ゲート） =====
 function checkAccessPin(){
@@ -1699,8 +1741,10 @@ function startSafetyCheck(){
   var msg=prompt("安否確認のメッセージを入力してください","地震・災害等のため、安否確認にご協力ください");
   if(msg===null) return;
   if(!msg.trim()) msg="安否確認にご協力ください";
-  var data={active:true,message:msg.trim(),startedBy:hUser.name,startedAt:new Date().toLocaleString("ja-JP"),id:Date.now(),responses:{}};
+  msg=msg.trim();
+  var data={active:true,message:msg,startedBy:hUser.name,startedAt:new Date().toLocaleString("ja-JP"),id:Date.now(),responses:{}};
   if(db){ db.ref("safetyCheck").set(data); }
+  sendSafetyPush("🚨 安否確認", msg);
   showToast("🚨 安否確認を開始しました");
 }
 function endSafetyCheck(){
@@ -1732,6 +1776,9 @@ function respondSafety(status){
 function renderSafety(){
   var el=document.getElementById("safetyPanel"); if(!el) return;
   var html="";
+  html+="<div style='display:flex;justify-content:flex-end;margin-bottom:8px'>"
+    +"<button onclick='requestNotifyPermission()' style='background:#eef2f9;color:#1a3a7a;border:1px solid #cdd7ea;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer'>🔔 この端末で通知を受け取る</button>"
+    +"</div>";
   if(safetyData.active){
     var myResp=safetyData.responses && safetyData.responses[safeKey(hUser.name)];
     html+="<div style='background:#fff3f0;border:1.5px solid #e08a6a;border-radius:10px;padding:14px;margin-bottom:14px'>";
