@@ -129,6 +129,16 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 </style>
 </head>
 <body>
+<div id="pinGate" style="position:fixed;inset:0;background:#0f1e3f;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:14px;padding:30px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.3)">
+    <div style="font-size:36px;margin-bottom:8px">🔒</div>
+    <div style="font-weight:700;font-size:16px;color:#1a2744;margin-bottom:4px">東近江製作所 スタッフ管理システム</div>
+    <div style="font-size:13px;color:#888;margin-bottom:18px">暗証番号を入力してください</div>
+    <input id="pinInput" type="tel" inputmode="numeric" autocomplete="off" placeholder="暗証番号" onkeydown="if(event.key==='Enter')submitAccessPin()" style="width:100%;box-sizing:border-box;padding:12px;font-size:18px;text-align:center;letter-spacing:4px;border:1.5px solid #ccc;border-radius:8px;margin-bottom:10px">
+    <div id="pinError" style="color:#c0392b;font-size:13px;margin-bottom:10px;display:none">暗証番号が違います</div>
+    <button onclick="submitAccessPin()" style="width:100%;background:#1a3a7a;color:#fff;border:none;border-radius:8px;padding:12px;font-size:15px;font-weight:700;cursor:pointer">ログイン</button>
+  </div>
+</div>
 <div class="app">
 <div class="hdr">
   <div class="hl">
@@ -274,6 +284,7 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
   <div style="display:flex;gap:8px;margin-bottom:9px">
     <input class="fi" id="staffSearch" oninput="filterStaff(this.value)" placeholder="🔍  名前・部署で検索..." style="flex:1">
     <button class="btn bg bsm" onclick="openAddStaff()">＋ 追加</button>
+    <button id="pinAdminBtn" class="btn bsm" onclick="changeAccessPin()" style="display:none;background:#e8a020;color:#fff">🔒 暗証番号変更</button>
   </div>
   <div class="sg" id="staffGrid"></div>
 </div>
@@ -339,6 +350,7 @@ function initFirebase(){
       db = firebase.database();
       dbReady = true;
       listenAll();
+      checkAccessPin();
     }
   } catch(e){ console.log("Firebase init error:", e); }
 }
@@ -454,6 +466,64 @@ function pad(n){ return String(n).padStart(2,"0"); }
 // ===== グローバル =====
 var lang="ja", curPg="home", calY=new Date().getFullYear(), calM=new Date().getMonth()+1, selDate=null, modalMode="", schedIdCounter=100, schedFilter="all";
 var ADMIN_NAME="吉田 尚未"; // 管理者名
+var ACCESS_PIN_DEFAULT="1234"; // 初回のみ使う初期暗証番号（管理者は後で変更可能）
+
+// ===== アクセス制限（暗証番号ゲート） =====
+function checkAccessPin(){
+  if(!db){ setTimeout(checkAccessPin,500); return; }
+  db.ref("settings/accessPin").once("value").then(function(snap){
+    var v=snap.val();
+    if(!v || !v.pin){
+      db.ref("settings/accessPin").set({pin:ACCESS_PIN_DEFAULT});
+      v={pin:ACCESS_PIN_DEFAULT};
+    }
+    var saved=localStorage.getItem("accessPin");
+    if(saved && saved===v.pin){
+      var gate=document.getElementById("pinGate"); if(gate) gate.style.display="none";
+    }
+  }).catch(function(){
+    var saved=localStorage.getItem("accessPin");
+    if(saved){ var gate=document.getElementById("pinGate"); if(gate) gate.style.display="none"; }
+  });
+}
+function submitAccessPin(){
+  var input=document.getElementById("pinInput");
+  var entered=(input.value||"").trim();
+  var errEl=document.getElementById("pinError");
+  if(!entered) return;
+  if(!db){ errEl.textContent="通信エラーです。少し待ってから再度お試しください。"; errEl.style.display="block"; return; }
+  db.ref("settings/accessPin").once("value").then(function(snap){
+    var v=snap.val();
+    var currentPin=(v && v.pin)?v.pin:ACCESS_PIN_DEFAULT;
+    if(entered===currentPin){
+      localStorage.setItem("accessPin",entered);
+      document.getElementById("pinGate").style.display="none";
+      errEl.style.display="none";
+    } else {
+      errEl.textContent="暗証番号が違います";
+      errEl.style.display="block";
+      input.value=""; input.focus();
+    }
+  }).catch(function(){
+    errEl.textContent="通信エラーです。少し待ってから再度お試しください。";
+    errEl.style.display="block";
+  });
+}
+function changeAccessPin(){
+  if(hUser.name!==ADMIN_NAME){ return; }
+  var next=prompt("新しい暗証番号を入力してください（半角数字など）");
+  if(!next) return;
+  next=next.trim();
+  if(!next){ return; }
+  if(db){
+    db.ref("settings/accessPin").set({pin:next}).then(function(){
+      localStorage.setItem("accessPin",next);
+      showToast("🔒 暗証番号を変更しました。他の端末は次回アクセス時に新しい番号の入力が必要になります");
+    }).catch(function(){
+      showToast("変更に失敗しました。通信状況をご確認ください");
+    });
+  }
+}
 var todayD=new Date();
 var todayStr=todayD.getFullYear()+"-"+pad(todayD.getMonth()+1)+"-"+pad(todayD.getDate());
 
@@ -1708,6 +1778,8 @@ function loadRules(){
   // 管理者のみ編集ボタンを表示
   var editBtn=document.getElementById("editRulesBtn");
   if(editBtn && hUser.name===ADMIN_NAME) editBtn.style.display="block";
+  var pinBtn=document.getElementById("pinAdminBtn");
+  if(pinBtn && hUser.name===ADMIN_NAME) pinBtn.style.display="block";
 }
 function openEditRules(){
   modalMode="editrules";
