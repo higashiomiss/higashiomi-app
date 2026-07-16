@@ -281,6 +281,7 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
   </div>
 </div>
 <div class="pg" id="pg-staff">
+  <div id="safetyPanel"></div>
   <div style="display:flex;gap:8px;margin-bottom:9px">
     <input class="fi" id="staffSearch" oninput="filterStaff(this.value)" placeholder="🔍  名前・部署で検索..." style="flex:1">
     <button class="btn bg bsm" onclick="openAddStaff()">＋ 追加</button>
@@ -434,6 +435,12 @@ function listenAll(){
     });
     renderFiles(); updateFileNotice();
   });
+  db.ref("safetyCheck").on("value", function(snap){
+    var v=snap.val();
+    safetyData = v || {active:false,responses:{}};
+    if(!safetyData.responses) safetyData.responses={};
+    renderSafety();
+  });
 }
 
 // ===== データ保存 =====
@@ -466,6 +473,8 @@ function pad(n){ return String(n).padStart(2,"0"); }
 // ===== グローバル =====
 var lang="ja", curPg="home", calY=new Date().getFullYear(), calM=new Date().getMonth()+1, selDate=null, modalMode="", schedIdCounter=100, schedFilter="all";
 var ADMIN_NAME="吉田 尚未"; // 管理者名
+var SAFETY_ADMINS=["吉田 尚未","近藤 竜二"]; // 安否確認を開始できる人
+var safetyData={active:false,responses:{}};
 var ACCESS_PIN_DEFAULT="1234"; // 初回のみ使う初期暗証番号（管理者は後で変更可能）
 
 // ===== アクセス制限（暗証番号ゲート） =====
@@ -1676,6 +1685,101 @@ function renderStaff(data){
 }
 function filterStaff(q){ renderStaff(staff.filter(function(s){ return s.name.toLowerCase().includes(q.toLowerCase())||s.dept.includes(q)||(deptVi[s.dept]||"").toLowerCase().includes(q.toLowerCase()); })); }
 
+// ===== 安否確認 =====
+function isSafetyAdmin(){ return SAFETY_ADMINS.indexOf(hUser.name)>=0; }
+function safeKey(name){ return String(name).replace(/[.#$\[\]\/]/g,"_"); }
+function safetyStatusLabel(s){
+  if(s==="safe") return "✅ 無事";
+  if(s==="injured_ok") return "🤕 ケガ(出勤可)";
+  if(s==="injured_no") return "🚑 ケガ(出勤不可)";
+  return "―";
+}
+function startSafetyCheck(){
+  if(!isSafetyAdmin()) return;
+  var msg=prompt("安否確認のメッセージを入力してください","地震・災害等のため、安否確認にご協力ください");
+  if(msg===null) return;
+  if(!msg.trim()) msg="安否確認にご協力ください";
+  var data={active:true,message:msg.trim(),startedBy:hUser.name,startedAt:new Date().toLocaleString("ja-JP"),id:Date.now(),responses:{}};
+  if(db){ db.ref("safetyCheck").set(data); }
+  showToast("🚨 安否確認を開始しました");
+}
+function endSafetyCheck(){
+  if(!isSafetyAdmin()) return;
+  if(!confirm("安否確認を終了しますか？（回答結果は残ります）")) return;
+  if(db){ db.ref("safetyCheck/active").set(false); }
+  showToast("安否確認を終了しました");
+}
+function clearSafetyCheck(){
+  if(!isSafetyAdmin()) return;
+  if(!confirm("安否確認の記録を完全に削除しますか？（テスト用・元に戻せません）")) return;
+  if(db){ db.ref("safetyCheck").remove(); }
+  showToast("安否確認の記録を削除しました");
+}
+function respondSafety(status){
+  if(!safetyData.active) return;
+  var payload={status:status,time:new Date().toLocaleString("ja-JP")};
+  function save(){
+    if(db){ db.ref("safetyCheck/responses/"+safeKey(hUser.name)).set(payload); }
+    showToast("回答しました："+safetyStatusLabel(status));
+  }
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(function(pos){
+      payload.lat=pos.coords.latitude; payload.lng=pos.coords.longitude;
+      save();
+    }, function(){ save(); }, {timeout:5000,maximumAge:60000});
+  } else { save(); }
+}
+function renderSafety(){
+  var el=document.getElementById("safetyPanel"); if(!el) return;
+  var html="";
+  if(safetyData.active){
+    var myResp=safetyData.responses && safetyData.responses[safeKey(hUser.name)];
+    html+="<div style='background:#fff3f0;border:1.5px solid #e08a6a;border-radius:10px;padding:14px;margin-bottom:14px'>";
+    html+="<div style='font-weight:700;color:#a8391a;font-size:15px;margin-bottom:4px'>🚨 安否確認実施中</div>";
+    html+="<div style='font-size:13px;color:#5a3a2a;margin-bottom:10px'>"+(safetyData.message||"")+"</div>";
+    html+="<div style='display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px'>"
+      +"<button onclick=\"respondSafety('safe')\" style='flex:1;min-width:90px;background:#2a7a4a;color:#fff;border:none;border-radius:8px;padding:10px 6px;font-size:13px;font-weight:700;cursor:pointer'>✅ 無事</button>"
+      +"<button onclick=\"respondSafety('injured_ok')\" style='flex:1;min-width:90px;background:#e8a020;color:#fff;border:none;border-radius:8px;padding:10px 6px;font-size:13px;font-weight:700;cursor:pointer'>🤕 ケガ（出勤可）</button>"
+      +"<button onclick=\"respondSafety('injured_no')\" style='flex:1;min-width:90px;background:#a8391a;color:#fff;border:none;border-radius:8px;padding:10px 6px;font-size:13px;font-weight:700;cursor:pointer'>🚑 ケガ（出勤不可）</button>"
+      +"</div>";
+    if(myResp){
+      html+="<div style='font-size:12px;color:#5a3a2a'>あなたの回答: <b>"+safetyStatusLabel(myResp.status)+"</b>（"+myResp.time+"）</div>";
+    }
+    html+="</div>";
+  }
+  if(isSafetyAdmin()){
+    var responded=safetyData.responses||{};
+    var count=Object.keys(responded).length;
+    html+="<div style='background:#f5f7fa;border-radius:10px;padding:12px;margin-bottom:14px'>";
+    html+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px'>";
+    html+="<div style='font-weight:700;font-size:14px;color:#1a2744'>🚨 安否確認（管理）</div>";
+    if(safetyData.active){
+      html+="<button onclick='endSafetyCheck()' style='background:#888;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer'>終了する</button>";
+    } else {
+      html+="<button onclick='startSafetyCheck()' style='background:#a8391a;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:700'>安否確認を開始</button>";
+    }
+    html+="</div>";
+    if(safetyData.active || count>0){
+      html+="<div style='font-size:12px;color:var(--sub);margin-bottom:8px'>回答済み "+count+" / "+staff.length+"名"+(safetyData.startedAt?"（開始: "+safetyData.startedAt+"）":"")+"</div>";
+      html+="<button onclick='clearSafetyCheck()' style='background:#e5e5e5;color:#a8391a;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;margin-bottom:8px'>🗑 記録を削除（テスト用）</button>";
+      html+="<div style='max-height:260px;overflow-y:auto'>";
+      staff.forEach(function(s){
+        var r=responded[safeKey(s.name)];
+        var color = r ? (r.status==="safe"?"#2a7a4a":r.status==="injured_ok"?"#e8a020":"#a8391a") : "#bbb";
+        var label = r ? safetyStatusLabel(r.status) : "未回答";
+        var mapLink = (r && r.lat!=null)?(" <a href='https://www.google.com/maps?q="+r.lat+","+r.lng+"' target='_blank' style='color:#1a5ab5;text-decoration:none'>📍地図</a>"):"";
+        html+="<div style='display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid #e5e5e5;font-size:12px'>"
+          +"<span>"+s.name+"</span>"
+          +"<span style='color:"+color+";font-weight:700'>"+label+mapLink+"</span>"
+          +"</div>";
+      });
+      html+="</div>";
+    }
+    html+="</div>";
+  }
+  el.innerHTML=html;
+}
+
 function renderTodaySlots(){
   var d=new Date();
   document.getElementById("todayDate").textContent=lang==="ja"?(d.getMonth()+1)+"月"+d.getDate()+"日":"Ngày "+d.getDate()+"/"+(d.getMonth()+1);
@@ -1798,7 +1902,7 @@ function reloadAll(){
 }
 function renderAll(){
   renderCal(); renderBoard(); renderHomeBoard(); renderSurveys(); renderStaff(staff); renderTodaySlots(); renderFiles();
-  updateDots(); updateFileNotice(); updateStaffCount();
+  updateDots(); updateFileNotice(); updateStaffCount(); renderSafety();
 }
 
 // ===== 初期化 =====
