@@ -25,7 +25,14 @@ messaging.onBackgroundMessage(function (payload) {
     (payload.data && payload.data.body) ||
     "";
 
-                              self.registration.showNotification(title, {
+// アプリを閉じていてもホーム画面アイコンにバッジ（数字）を表示する
+  try {
+    if (self.navigator && self.navigator.setAppBadge) {
+      self.navigator.setAppBadge(1).catch(function () {});
+    }
+  } catch (e) {}
+  
+  self.registration.showNotification(title, {
                                 body: body,
                                 tag: "safety-check",
                                 renotify: true,
