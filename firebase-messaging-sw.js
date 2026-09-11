@@ -25,8 +25,11 @@ messaging.onBackgroundMessage(function (payload) {
     (payload.data && payload.data.body) ||
     "";
 
-  self.registration.showNotification(title, {
-    body: body,
-    tag: "safety-check"
-  });
+                              self.registration.showNotification(title, {
+                                body: body,
+                                tag: "safety-check",
+                                renotify: true,
+                                requireInteraction: true,
+                                vibrate: [200, 100, 200, 100, 200]
+                              });
 });
