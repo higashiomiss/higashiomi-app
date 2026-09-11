@@ -354,8 +354,30 @@ function initFirebase(){
       dbReady = true;
       listenAll();
       checkAccessPin();
+      setupForegroundNotify();
     }
   } catch(e){ console.log("Firebase init error:", e); }
+}
+
+// アプリを開いている時（フォアグラウンド）にプッシュ通知を受け取ったら表示する
+function setupForegroundNotify(){
+try{
+if(typeof firebase==="undefined" || !firebase.messaging) return;
+var fgMessaging = firebase.messaging();
+fgMessaging.onMessage(function(payload){
+var title = (payload.notification && payload.notification.title) || (payload.data && payload.data.title) || "🚨 安否確認";
+var body = (payload.notification && payload.notification.body) || (payload.data && payload.data.body) || "";
+if(window.Notification && Notification.permission==="granted" && navigator.serviceWorker){
+navigator.serviceWorker.getRegistration().then(function(reg){
+if(reg){
+reg.showNotification(title,{body:body,tag:"safety-check",renotify:true,requireInteraction:true,vibrate:[200,100,200,100,200]});
+}else{
+new Notification(title,{body:body});
+}
+});
+}
+});
+}catch(e){ console.log("setupForegroundNotify error:", e); }
 }
 
 // ===== リアルタイム読み込み =====
