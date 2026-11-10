@@ -390,7 +390,7 @@ function saveData(){
     localStorage.setItem("staff2", JSON.stringify(staff));
   }catch(e){}
 }
-function safeKey(n){ return encodeURIComponent(n).replace(/%/g,"-").replace(/[.#$\[\]/]/g,"_"); }
+function safeKey(n){ return encodeURIComponent(n).replace(/%/g,"-").replace(/[.#$\[\]]/g,"_"); }
 function saveFileData(){
   if(db){
     try{ db.ref("fileData").set(fileData); }catch(e){}
