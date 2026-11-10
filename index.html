@@ -1094,8 +1094,8 @@ function renderCal(){
       var ev=getFilteredSched(ds); if(ev.length){
         ev.forEach(function(s){
           var chip=document.createElement("span"); chip.className="cal-chip";
-          var nm=s.member&&s.member.length?s.member.join(","):s.poster||"";
-          chip.textContent=nm?nm.split(",")[0].split(" ")[0]:""; el.appendChild(chip);
+          var nm=s.member&&s.member!==""?s.member:s.poster||"";
+          chip.textContent=nm?nm.split(",")[0].trim():""; el.appendChild(chip);
         });
       }
       el.onclick=(function(ds){ return function(){ selectDay(ds); }; })(ds);
