@@ -47,7 +47,7 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 .cd{min-height:44px;display:flex;align-items:flex-start;justify-content:flex-start;border-radius:7px;cursor:pointer;font-size:13px;position:relative;padding:3px 2px;flex-direction:column;min-width:0;overflow:hidden}
 .cd.today{background:var(--navy)!important;color:#fff!important;font-weight:700}
 .cd.sel{background:var(--gold)!important;color:#fff!important}
-.cd.sat{color:#1a5ab5}.cd.wd{background:#ddf0fa;color:#1a2744}
+.cd.sat{color:#1a5ab5}.cd.sun{color:#e53935}.cd.od.sat{color:#1a5ab5}.cd.od.sun{color:#e53935}.cd.wd{background:#ddf0fa;color:#1a2744}
 .cal-chip{display:block;font-size:9px;background:#1a7fcb;color:#fff;border-radius:3px;padding:0 3px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cd.od{background:#fef6f6;color:var(--red)}.cd.em{cursor:default;background:transparent!important}
 .cd.hs::after{content:'';position:absolute;bottom:3px;width:5px;height:5px;background:var(--gold);border-radius:50%}
@@ -1007,8 +1007,9 @@ function renderCal(){
       var cls="cd";
       if(ds===todayStr) cls+=" today";
       else if(ds===selDate) cls+=" sel";
-      else if(off) cls+=" od";
+      else if(off) cls+=" od"+(dow===0?" sun":dow===6?" sat":"");
       else if(dow===6) cls+=" sat wd";
+      else if(dow===0) cls+=" sun wd";
       else cls+=" wd";
       if(getFilteredSched(ds).length) cls+=" hs";
       var el=document.createElement("div"); el.className=cls;
