@@ -1087,7 +1087,6 @@ function renderCal(){
       else if(ds===selDate) cls+=" sel";
       else if(off) cls+=" od";
       else cls+=" wd";
-      else cls+=" wd";
       if(getFilteredSched(ds).length) cls+=" hs";
       var el=document.createElement("div"); el.className=cls;
       var daySpan=document.createElement("span"); daySpan.textContent=d; el.appendChild(daySpan);
