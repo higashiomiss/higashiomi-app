@@ -354,21 +354,22 @@ function listenAll(){
       if(el) el.textContent="就業規則はまだ登録されていません。";
     }
   });
-  db.ref("fileData").on("value", function(snap){
-    var v = snap.val();
-    if(!v){ fileData=[]; }
-    else if(Array.isArray(v)) fileData = v;
-    else fileData = Object.values(v).filter(function(x){ return x && x.id; });
-    fileData.forEach(function(f){
-      f.id = parseInt(f.id)||f.id;
-      // toGroupが配列でなくオブジェクトになっている場合を修正
-      if(f.toGroup && !Array.isArray(f.toGroup)){
-        f.toGroup = Object.values(f.toGroup);
-      }
-      if(!f.toGroup) f.toGroup = [];
+  // --- ファイルプライバシー: 自分宛・自分送信・全員のみ取得 ---
+  var _fdInbox={}, _fdSent={}, _fdAll={};
+  function _mergeFileData(){
+    var merged={};
+    [_fdAll,_fdInbox,_fdSent].forEach(function(src){
+      Object.values(src).forEach(function(f){
+        if(f&&f.id){ f.id=parseInt(f.id)||f.id; if(!f.toGroup)f.toGroup=[]; if(f.toGroup&&!Array.isArray(f.toGroup))f.toGroup=Object.values(f.toGroup); merged[f.id]=f; }
+      });
     });
+    fileData=Object.values(merged).sort(function(a,b){ return (b.id||0)-(a.id||0); });
     renderFiles(); updateFileNotice();
-  });
+  }
+  var _myKey=safeKey(hUser.name);
+  db.ref("fileData_inbox/"+_myKey).on("value",function(snap){ _fdInbox=snap.val()||{}; _mergeFileData(); });
+  db.ref("fileData_sent/"+_myKey).on("value",function(snap){ _fdSent=snap.val()||{}; _mergeFileData(); });
+  db.ref("fileData_all").on("value",function(snap){ var v=snap.val()||{}; if(Array.isArray(v)){var o={};v.forEach(function(f){if(f&&f.id)o[f.id]=f;});_fdAll=o;}else _fdAll=v; _mergeFileData(); });
 }
 
 // ===== データ保存 =====
@@ -389,6 +390,7 @@ function saveData(){
     localStorage.setItem("staff2", JSON.stringify(staff));
   }catch(e){}
 }
+function safeKey(n){ return encodeURIComponent(n).replace(/%/g,"-").replace(/[.#$\[\]/]/g,"_"); }
 function saveFileData(){
   if(db){
     try{ db.ref("fileData").set(fileData); }catch(e){}
@@ -867,9 +869,28 @@ function submitModal(){
     var reader=new FileReader();
     reader.onload=function(e){
       var entry={id:Date.now(),to:toName,toGroup:toGroup,from:hUser.name,name:file.name,size:file.size,data:e.target.result,note:note,time:"今"};
-      fileData.unshift(entry);
-      saveFileData();
-      if(!dbReady){ renderFiles(); updateFileNotice(); }
+      if(db){
+        try{
+          var _fk=safeKey(hUser.name);
+          // 送信者の送信済みに保存
+          db.ref("fileData_sent/"+_fk+"/"+entry.id).set(entry);
+          if(sendType==="all"){
+            // 全員宛: fileData_all に保存（全員がリッスン）
+            db.ref("fileData_all/"+entry.id).set(entry);
+          } else if(sendType==="group"){
+            // グループ宛: 各受信者のinboxに保存
+            toGroup.forEach(function(nm){
+              db.ref("fileData_inbox/"+safeKey(nm)+"/"+entry.id).set(entry);
+            });
+          } else {
+            // 個人宛: 受信者のinboxに保存
+            db.ref("fileData_inbox/"+safeKey(toName)+"/"+entry.id).set(entry);
+          }
+        }catch(e2){}
+      } else {
+        fileData.unshift(entry);
+        renderFiles(); updateFileNotice();
+      }
       var msg=sendType==="all"?"全員に送信しました":sendType==="group"?"グループ("+toGroup.length+"名)に送信しました":toName+"さんに送信しました";
       showToast("📎 "+msg);
     };
@@ -918,9 +939,26 @@ function delStaff(id){
 }
 function delFile(id){
   if(!confirm("このファイルを削除しますか？")) return;
+  // ローカルから削除
+  var target=fileData.find(function(f){ return f.id===id||parseInt(f.id)===id; });
   fileData=fileData.filter(function(f){ return f.id!==id && parseInt(f.id)!==id; });
-  saveFileData();
   renderFiles(); updateFileNotice();
+  if(db&&target){
+    try{
+      var _fk=safeKey(hUser.name);
+      var _tid=target.id;
+      // 送信者なら送信済みと受信者inboxから削除
+      db.ref("fileData_sent/"+_fk+"/"+_tid).remove();
+      db.ref("fileData_all/"+_tid).remove();
+      if(target.toGroup&&target.toGroup.length){
+        target.toGroup.forEach(function(nm){ db.ref("fileData_inbox/"+safeKey(nm)+"/"+_tid).remove(); });
+      } else if(target.to){
+        db.ref("fileData_inbox/"+safeKey(target.to)+"/"+_tid).remove();
+      }
+      // 受信者なら自分のinboxから削除
+      db.ref("fileData_inbox/"+_fk+"/"+_tid).remove();
+    }catch(e){}
+  }
   showToast(t("deleted"));
 }
 
@@ -1351,7 +1389,7 @@ function clearAllData(){
     db.ref("schedData").remove();
     db.ref("boardData").remove();
     db.ref("survData").remove();
-    db.ref("fileData").remove();
+    db.ref("fileData_inbox").remove(); db.ref("fileData_sent").remove(); db.ref("fileData_all").remove(); db.ref("fileData").remove();
     db.ref("staffData").remove();
   }
   try{
