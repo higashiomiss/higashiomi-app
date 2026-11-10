@@ -1086,6 +1086,7 @@ function renderCal(){
       if(ds===todayStr) cls+=" today";
       else if(ds===selDate) cls+=" sel";
       else if(off) cls+=" od";
+      else if(dow===6) cls+=" sat wd";
       else cls+=" wd";
       if(getFilteredSched(ds).length) cls+=" hs";
       var el=document.createElement("div"); el.className=cls;
