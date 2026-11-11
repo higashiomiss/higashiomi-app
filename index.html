@@ -244,6 +244,19 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 
 </div></div>
 
+<div class="mbg" id="fileViewModal" style="z-index:700;display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;flex-direction:column">
+  <div style="width:100%;max-width:700px;height:90vh;display:flex;flex-direction:column;padding:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div id="fileViewName" style="color:#fff;font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></div>
+      <div style="display:flex;gap:8px;margin-left:8px">
+        <a id="fileViewDlBtn" style="background:#1a7fcb;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;text-decoration:none;cursor:pointer;white-space:nowrap" download>⬇ 保存</a>
+        <button onclick="closeFileView()" style="background:#e53935;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer">✕ 閉じる</button>
+      </div>
+    </div>
+    <iframe id="fileViewFrame" style="flex:1;border:none;border-radius:8px;background:#fff;width:100%"></iframe>
+  </div>
+</div>
+
 <div class="mbg" id="modal">
   <div class="modal">
     <div class="mt" id="modalTitle"></div>
@@ -962,6 +975,27 @@ function delFile(id){
   showToast(t("deleted"));
 }
 
+function openFileView(data,name){
+  var modal=document.getElementById("fileViewModal");
+  var frame=document.getElementById("fileViewFrame");
+  var nameEl=document.getElementById("fileViewName");
+  var dlBtn=document.getElementById("fileViewDlBtn");
+  if(!modal||!frame) return;
+  nameEl.textContent=name;
+  dlBtn.href=data;
+  dlBtn.download=name;
+  // iframeにdata URLをセット
+  frame.src=data;
+  modal.style.display="flex";
+  document.body.style.overflow="hidden";
+}
+function closeFileView(){
+  var modal=document.getElementById("fileViewModal");
+  var frame=document.getElementById("fileViewFrame");
+  if(modal){ modal.style.display="none"; }
+  if(frame){ frame.src="about:blank"; }
+  document.body.style.overflow="";
+}
 function closeTransModal(){
   document.getElementById("transModal").classList.remove("on");
 }
@@ -1277,22 +1311,7 @@ function renderFiles(){
     var delBtn=document.createElement("button"); delBtn.className="fi-del"; delBtn.textContent="✕";
     delBtn.onclick=(function(id){ return function(){ delFile(id); }; })(f.id);
     var dlBtn=document.createElement("button"); dlBtn.className="fi-dl"; dlBtn.textContent="⬇ 開く・保存";
-    dlBtn.onclick=(function(data,name){
-      return function(){
-        // iPhoneはa.click()が効かないのでwindow.openを使う
-        try{
-          var w=window.open("","_blank");
-          if(w){
-            w.document.write("<html><body style='margin:0;background:#000'><img src=\""+data+"\" style='max-width:100%' onerror=\"this.style.display=\'none\'\"><a href=\""+data+"\" download=\""+name+"\" style=\"display:block;padding:20px;color:#fff;font-size:18px\">⬇ "+name+" を保存</a></body></html>");
-            w.document.close();
-          } else {
-            var a=document.createElement("a"); a.href=data; a.download=name; a.target="_blank"; a.click();
-          }
-        }catch(e){
-          var a=document.createElement("a"); a.href=data; a.download=name; a.target="_blank"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        }
-      };
-    })(f.data,f.name);
+    dlBtn.onclick=(function(data,name){ return function(){ openFileView(data,name); }; })(f.data,f.name);
     el.innerHTML="<div style='font-weight:600;font-size:14px'>"+f.name+"</div><div style='font-size:12px;color:var(--sub);margin-top:2px'>宛先: <b>"+f.to+"</b> ← 送信者: "+f.from+" ・ "+size+(f.note?" ・ "+f.note:"")+"</div>"+preview;
     el.appendChild(dlBtn); el.appendChild(delBtn); list.appendChild(el);
   });
