@@ -175,10 +175,10 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 <div class="pg" id="pg-schedule">
   <div class="card" style="padding:10px">
     <div style="font-size:12px;color:var(--sub);margin-bottom:6px;font-weight:500">📋 表示するスケジュール</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap" id="schedFilter">
-      <button class="filt-btn on" onclick="setFilter('all')" id="filt-all">👥 全員</button>
-      <button class="filt-btn" onclick="setFilter('me')" id="filt-me">👤 自分</button>
-    </div>
+    <select id="schedFilter" onchange="setFilter(this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--tx);cursor:pointer">
+      <option value="all">👥 全員</option>
+      <option value="me">👤 自分</option>
+    </select>
   </div>
   <div class="card">
     <div class="cn"><button class="ca" onclick="chMonth(-1)">◀</button><div class="cm" id="calLabel"></div><button class="ca" onclick="chMonth(1)">▶</button></div>
@@ -547,29 +547,35 @@ function setLang(l){
 
 function setFilter(f){
   schedFilter=f;
-  document.querySelectorAll(".filt-btn").forEach(function(b){ b.classList.remove("on"); });
-  var btn=document.getElementById("filt-"+f);
-  if(btn) btn.classList.add("on");
+  var sel=document.getElementById("schedFilter");
+  if(sel && sel.tagName==="SELECT") sel.value=f;
   renderCal();
   if(selDate) renderDayDetail(selDate);
 }
 function buildDeptFilters(){
   var depts={};
   staff.forEach(function(s){ depts[s.dept]=true; });
-  var container=document.getElementById("schedFilter");
-  // 既存ボタン以外を削除
-  var btns=container.querySelectorAll(".filt-btn");
-  btns.forEach(function(b,i){ if(i>1) b.remove(); });
-  // 部署ボタン追加
-  Object.keys(depts).forEach(function(dept){
-    var id="filt-dept-"+dept;
-    if(!document.getElementById(id)){
-      var btn=document.createElement("button");
-      btn.className="filt-btn"; btn.id=id; btn.textContent="🏢 "+dept;
-      btn.onclick=(function(d){ return function(){ setFilter("dept:"+d); }; })(dept);
-      container.appendChild(btn);
+  var sel=document.getElementById("schedFilter");
+  if(!sel||sel.tagName!=="SELECT") return;
+  // 部署以外のoption以外を削除して再構築
+  while(sel.options.length>2) sel.remove(2);
+  // 本社・各部署を追加
+  var added={};
+  staff.forEach(function(s){
+    if(!added[s.name]){
+      var opt=document.createElement("option");
+      opt.value=s.name; opt.textContent="👤 "+s.name;
+      sel.appendChild(opt);
+      added[s.name]=true;
     }
   });
+  Object.keys(depts).forEach(function(dept){
+    var opt=document.createElement("option");
+    opt.value="dept:"+dept; opt.textContent="🏢 "+dept;
+    sel.appendChild(opt);
+  });
+  // 現在の選択値を維持
+  sel.value=schedFilter||"all";
 }
 function getFilteredSched(ds){
   var raw=schedData[ds];
