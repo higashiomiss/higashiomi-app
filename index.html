@@ -914,6 +914,18 @@ function delSched(ds,id){
   if(!dbReady){ renderDayDetail(ds); renderCal(); renderTodaySlots(); }
   showToast(t("deleted"));
 }
+function markRead(id){
+  var b=boardData.find(function(x){ return x.id===id||parseInt(x.id)===id; });
+  if(!b) return;
+  if(!b.readBy) b.readBy=[];
+  if(!Array.isArray(b.readBy)) b.readBy=Object.values(b.readBy);
+  if(b.readBy.indexOf(hUser.name)<0){
+    b.readBy.push(hUser.name);
+    saveData();
+    renderBoard(); renderHomeBoard(); updateDots();
+    showToast("既読にしました");
+  }
+}
 function delBoard(id){
   if(!confirm(t("delBoard"))) return;
   var b=boardData.find(function(x){ return x.id===id||parseInt(x.id)===id; });
