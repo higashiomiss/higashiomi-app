@@ -130,6 +130,7 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
   <button class="nb2" id="n-survey" onclick="showPage('survey')"><span class="ni">📊</span><span>アンケート</span></button>
   <button class="nb2" id="n-staff" onclick="showPage('staff')"><span class="ni">👥</span><span>名簿</span></button>
   <button class="nb2" id="n-files" onclick="showPage('files')"><span class="ni">📎</span><span>ファイル</span></button>
+  <button class="nb2" id="n-anpi" onclick="showPage('anpi')" style="position:relative"><span class="ni">🆘</span><span>安否確認</span><span class="nd" id="anpiDot" style="display:none;position:absolute;top:4px;right:4px;background:#e74c3c">!</span></button>
 </nav>
 <div class="ct">
 
@@ -165,7 +166,12 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
   </div>
   <div class="card">
     <div class="tit">📋 最新の伝言</div>
-    <div id="homeBoard"></div>
+    <div id="anpiHomeBanner" style="display:none;background:#e74c3c;color:#fff;border-radius:10px;padding:12px 14px;margin-bottom:12px;cursor:pointer" onclick="showPage('anpi')">
+  <div style="font-weight:700;font-size:15px">🆘 安否確認が届いています</div>
+  <div id="anpiHomeBannerDesc" style="font-size:13px;margin-top:3px;opacity:0.9"></div>
+  <div style="font-size:12px;margin-top:4px;opacity:0.8">タップして回答する →</div>
+</div>
+<div id="homeBoard"></div>
   </div>
   
   
@@ -229,6 +235,43 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 <div class="pg" id="pg-files">
   <div class="shd"><div style="font-size:17px;font-weight:700">📎 ファイル共有</div><button class="btn bsm bg" onclick="openAddFile()">＋ 送信</button></div>
   <div id="fileList"></div>
+</div>
+
+<div class="pg" id="pg-anpi">
+  <div class="shd"><div style="font-size:17px;font-weight:700">🆘 安否確認</div><span id="anpiAdminBtn"></span></div>
+  <div id="anpiUserPanel" style="display:none">
+    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:14px;margin-bottom:14px;font-size:14px;line-height:1.6">
+      <div style="font-weight:700;font-size:15px;margin-bottom:6px">🆘 安否確認が届いています</div>
+      <div id="anpiEventDesc" style="color:#555;margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="submitAnpi('safe')" style="flex:1;padding:12px;background:#2ecc71;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">✅ 安全です</button>
+        <button onclick="submitAnpi('unsafe')" style="flex:1;padding:12px;background:#e74c3c;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">🚨 助けが必要</button>
+        <button onclick="submitAnpi('home')" style="flex:1;padding:12px;background:#3498db;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">🏠 自宅待機</button>
+      </div>
+      <div id="anpiMyStatus" style="margin-top:10px;font-size:13px;color:#666"></div>
+    </div>
+  </div>
+  <div id="anpiNoEvent" style="text-align:center;color:var(--sub);padding:30px;font-size:14px">現在、安否確認は実施されていません</div>
+  <div id="anpiResultList" style="display:none">
+    <div style="font-size:13px;font-weight:700;color:var(--sub);margin-bottom:8px" id="anpiResultTitle"></div>
+    <div id="anpiResultRows"></div>
+  </div>
+</div>
+
+<!-- 安否確認作成モーダル（管理者用） -->
+<div class="mbg" id="anpiModal" style="display:none" onclick="if(event.target===this)closeAnpiModal()">
+  <div class="mc" style="max-width:420px;width:95%">
+    <div class="mh">🆘 安否確認を送信</div>
+    <div class="mb">
+      <div class="fl"><label class="lb">イベント名・状況説明</label>
+        <textarea id="anpiDesc" rows="3" placeholder="例：地震が発生しました。現在の状況を報告してください。" style="width:100%;padding:8px;border:1px solid var(--bd);border-radius:7px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn" onclick="closeAnpiModal()">キャンセル</button>
+      <button class="btn bg" onclick="sendAnpiEvent()">📨 送信</button>
+    </div>
+  </div>
 </div>
 
 </div></div>
@@ -372,7 +415,161 @@ function listenAll(){
   db.ref("fileData_inbox/"+_myKey).on("value",function(snap){ _fdInbox=snap.val()||{}; _mergeFileData(); });
   db.ref("fileData_sent/"+_myKey).on("value",function(snap){ _fdSent=snap.val()||{}; _mergeFileData(); });
   db.ref("fileData_all").on("value",function(snap){ var v=snap.val()||{}; if(Array.isArray(v)){var o={};v.forEach(function(f){if(f&&f.id)o[f.id]=f;});_fdAll=o;}else _fdAll=v; _mergeFileData(); });
+  // 安否確認リスナー
+  db.ref("anpiData").on("value",function(snap){
+    anpiData=snap.val()||{active:false,desc:"",responses:{}};
+    if(!anpiData.responses) anpiData.responses={};
+    renderAnpi();
+  });
 }
+
+// ===== 安否確認 =====
+function renderAnpi(){
+  updateDots();
+  var active=anpiData&&anpiData.active;
+  var userPanel=document.getElementById("anpiUserPanel");
+  var noEvent=document.getElementById("anpiNoEvent");
+  var resultList=document.getElementById("anpiResultList");
+  var adminBtn=document.getElementById("anpiAdminBtn");
+  if(!userPanel) return;
+
+  // 管理者ボタン
+  if(adminBtn){
+    if(hUser.name===ADMIN_NAME){
+      if(active){
+        adminBtn.innerHTML='<button onclick="closeAnpiEvent()" style="background:#e74c3c;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:13px;cursor:pointer;margin-left:8px">■ 終了</button>';
+      } else {
+        adminBtn.innerHTML='<button onclick="openAnpiModal()" style="background:#e74c3c;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:13px;cursor:pointer;margin-left:8px">＋ 送信</button>';
+      }
+    } else {
+      adminBtn.innerHTML='';
+    }
+  }
+
+  // ホーム画面バナー更新
+  var homeBanner=document.getElementById("anpiHomeBanner");
+  var homeBannerDesc=document.getElementById("anpiHomeBannerDesc");
+  if(homeBanner){
+    if(active){
+      var myKey2=safeKey(hUser.name);
+      var alreadyAnswered=anpiData.responses&&anpiData.responses[myKey2];
+      if(!alreadyAnswered){
+        homeBanner.style.display="block";
+        if(homeBannerDesc) homeBannerDesc.textContent=anpiData.desc||"";
+      } else {
+        homeBanner.style.display="none";
+      }
+    } else {
+      homeBanner.style.display="none";
+    }
+  }
+
+  if(!active){
+    userPanel.style.display="none";
+    noEvent.style.display="block";
+    resultList.style.display="none";
+    return;
+  }
+
+  noEvent.style.display="none";
+  userPanel.style.display="block";
+
+  // イベント説明
+  var descEl=document.getElementById("anpiEventDesc");
+  if(descEl) descEl.textContent=anpiData.desc||"";
+
+  // 自分の回答状況
+  var myStatus=document.getElementById("anpiMyStatus");
+  var myKey=safeKey(hUser.name);
+  var myResp=anpiData.responses[myKey];
+  if(myResp){
+    var statusText=myResp.status==="safe"?"✅ 安全です":myResp.status==="unsafe"?"🚨 助けが必要":"🏠 自宅待機";
+    if(myStatus) myStatus.textContent="回答済み："+statusText;
+  } else {
+    if(myStatus) myStatus.textContent="まだ回答していません";
+  }
+
+  // 管理者は集計結果を表示
+  if(hUser.name===ADMIN_NAME){
+    resultList.style.display="block";
+    var rows=document.getElementById("anpiResultRows");
+    var titleEl=document.getElementById("anpiResultTitle");
+    var resp=anpiData.responses||{};
+    var total=staff.length;
+    var answered=Object.keys(resp).length;
+    if(titleEl) titleEl.textContent="回答状況："+answered+"/"+total+"名";
+    if(rows){
+      rows.innerHTML="";
+      var byStatus={safe:[],unsafe:[],home:[],none:[]};
+      staff.forEach(function(s){
+        var k=safeKey(s.name);
+        var r=resp[k];
+        if(!r){ byStatus.none.push(s.name); return; }
+        if(r.status==="safe") byStatus.safe.push(s.name);
+        else if(r.status==="unsafe") byStatus.unsafe.push(s.name);
+        else byStatus.home.push(s.name);
+      });
+      var groups=[
+        {key:"unsafe",label:"🚨 助けが必要",color:"#e74c3c"},
+        {key:"safe",label:"✅ 安全",color:"#2ecc71"},
+        {key:"home",label:"🏠 自宅待機",color:"#3498db"},
+        {key:"none",label:"⬜ 未回答",color:"#999"}
+      ];
+      groups.forEach(function(g){
+        if(!byStatus[g.key].length) return;
+        var sec=document.createElement("div");
+        sec.style.cssText="margin-bottom:10px;border-radius:8px;overflow:hidden;border:1px solid #eee";
+        var hdr=document.createElement("div");
+        hdr.style.cssText="background:"+g.color+";color:#fff;padding:7px 12px;font-weight:700;font-size:13px";
+        hdr.textContent=g.label+" ("+byStatus[g.key].length+"名)";
+        sec.appendChild(hdr);
+        byStatus[g.key].forEach(function(nm){
+          var row=document.createElement("div");
+          row.style.cssText="padding:7px 12px;font-size:14px;border-top:1px solid #f0f0f0;background:#fff";
+          row.textContent=nm;
+          sec.appendChild(row);
+        });
+        rows.appendChild(sec);
+      });
+    }
+  }
+}
+
+function openAnpiModal(){
+  document.getElementById("anpiDesc").value="";
+  document.getElementById("anpiModal").style.display="flex";
+}
+function closeAnpiModal(){
+  document.getElementById("anpiModal").style.display="none";
+}
+function sendAnpiEvent(){
+  var desc=document.getElementById("anpiDesc").value.trim();
+  if(!desc){ showToast("状況説明を入力してください"); return; }
+  var data={active:true,desc:desc,responses:{},sentAt:Date.now()};
+  if(db){
+    db.ref("anpiData").set(data);
+  }
+  closeAnpiModal();
+  showToast("📨 安否確認を送信しました");
+}
+function closeAnpiEvent(){
+  if(!confirm("安否確認を終了しますか？")) return;
+  if(db){
+    db.ref("anpiData/active").set(false);
+  }
+  showToast("安否確認を終了しました");
+}
+function submitAnpi(status){
+  if(!anpiData||!anpiData.active){ showToast("安否確認は終了しています"); return; }
+  var myKey=safeKey(hUser.name);
+  var resp={name:hUser.name,status:status,time:new Date().toLocaleString("ja-JP")};
+  if(db){
+    db.ref("anpiData/responses/"+myKey).set(resp);
+  }
+  var statusText=status==="safe"?"✅ 安全です":status==="unsafe"?"🚨 助けが必要":"🏠 自宅待機";
+  showToast(statusText+" で回答しました");
+}
+
 
 // ===== データ保存 =====
 function saveData(){
@@ -430,6 +627,7 @@ var ALL_FHOL=FHOL.concat(FHOL27);
 function isOff(ds){ var dow=new Date(ds+"T00:00:00").getDay(); return ALL_FHOL.indexOf(ds)>=0||dow===0||dow===6; }
 
 // ===== スタッフ =====
+var anpiData={active:false,desc:"",responses:{}};
 var staff=[
   {id:1,name:"近藤 竜二",dept:"本社"},{id:2,name:"那須 秋男",dept:"製造部"},
   {id:3,name:"QUISPE JOSE MANUEL",dept:"プレス加工課"},{id:5,name:"藤岡 建瑠",dept:"溶接課"},
@@ -600,7 +798,7 @@ function showPage(pg){
   document.getElementById("pg-"+pg).classList.add("on");
   document.getElementById("n-"+pg).classList.add("on");
   curPg=pg;
-
+  if(pg==="anpi") renderAnpi();
 }
 function onFab(){
   if(curPg==="schedule") openAddSched();
@@ -1427,6 +1625,18 @@ function updateDots(){
   var sDot=document.getElementById("sDot"); sDot.textContent=todayCount; sDot.style.display=todayCount>0?"flex":"none";
   document.getElementById("todayCnt").textContent=todayCount;
   document.getElementById("unreadCnt").textContent=newCount;
+  // 安否確認ドット
+  var anpiDot=document.getElementById("anpiDot");
+  if(anpiDot){
+    var anpiActive=anpiData&&anpiData.active;
+    if(anpiActive){
+      var _myKey=safeKey(hUser.name);
+      var _answered=anpiData.responses&&anpiData.responses[_myKey];
+      anpiDot.style.display=_answered?"none":"flex";
+    } else {
+      anpiDot.style.display="none";
+    }
+  }
 }
 
 function clearAllData(){
