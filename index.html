@@ -455,6 +455,9 @@ function isIOS(){ return /iPhone|iPad|iPod/.test(navigator.userAgent) || (naviga
 function isStandalone(){ return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true; }
 function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+// 端末ごとの識別子（同じ人がPCとスマホの両方で通知を受け取れるように）
+function deviceId(){ var d=lsGet("pushDevice"); if(!d){ d=Date.now().toString(36)+Math.random().toString(36).slice(2,8); lsSet("pushDevice",d); } return d; }
+function pushKeyFor(){ return safeKey(hUser.name)+"__"+deviceId(); }
 function updateNotifyUI(msg){
   var st=document.getElementById("notifyStatus"), btn=document.getElementById("notifyBtn");
   if(!st||!btn) return;
@@ -468,7 +471,7 @@ function updateNotifyUI(msg){
   if(perm==="denied"){
     st.textContent="通知がブロックされています。ブラウザ（またはスマホ）の設定でこのサイトの通知を「許可」にしてください";
     btn.style.display="none";
-  } else if(perm==="granted" && lsGet("pushKey")===safeKey(hUser.name)){
+  } else if(perm==="granted" && lsGet("pushKey")===pushKeyFor()){
     if(!msg) st.textContent="✅ この端末で通知を受け取ります（"+hUser.name+"）";
     btn.textContent="🔄 再登録"; btn.className="btn bsm bo"; btn.style.display="inline-block";
   } else {
@@ -488,7 +491,7 @@ function enablePush(silent){
       return firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
     }).then(function(token){
       if(!token) throw new Error("token");
-      var key=safeKey(hUser.name), oldKey=lsGet("pushKey");
+      var key=pushKeyFor(), oldKey=lsGet("pushKey");
       var jobs=[db.ref("pushTokens/"+key).set(token)];
       if(oldKey && oldKey!==key) jobs.push(db.ref("pushTokens/"+oldKey).remove());
       return Promise.all(jobs).then(function(){
@@ -506,7 +509,7 @@ function enablePush(silent){
 // 出来事（予定追加・安否確認開始）を送信APIに知らせる。文面はサーバー側でデータベースから作る
 function notifyEvent(payload){
   try{
-    payload.fromKey=safeKey(hUser.name);
+    payload.fromKey=pushKeyFor();
     fetch(NOTIFY_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
       .then(function(r){ return r.json(); })
       .then(function(j){ console.log("notify",j); })
