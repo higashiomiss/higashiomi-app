@@ -919,11 +919,29 @@ function markRead(id){
   if(!b) return;
   if(!b.readBy) b.readBy=[];
   if(!Array.isArray(b.readBy)) b.readBy=Object.values(b.readBy);
-  if(b.readBy.indexOf(hUser.name)<0){
-    b.readBy.push(hUser.name);
+  if(b.readBy.indexOf(hUser.name)>=0) return;
+  b.readBy.push(hUser.name);
+  renderBoard(); renderHomeBoard(); updateDots();
+  showToast("既読にしました");
+  if(db){
+    db.ref("boardData").once("value",function(snap){
+      var v=snap.val();
+      var arr=[];
+      if(!v){ return; }
+      else if(Array.isArray(v)) arr=v;
+      else arr=Object.values(v).filter(function(x){ return x&&x.id; });
+      var idx=-1;
+      for(var i=0;i<arr.length;i++){
+        if(arr[i]&&(arr[i].id===id||parseInt(arr[i].id)===id)){ idx=i; break; }
+      }
+      if(idx<0){ saveData(); return; }
+      var rb=arr[idx].readBy||[];
+      if(!Array.isArray(rb)) rb=Object.values(rb);
+      if(rb.indexOf(hUser.name)<0){ rb.push(hUser.name); }
+      db.ref("boardData/"+idx+"/readBy").set(rb);
+    });
+  } else {
     saveData();
-    renderBoard(); renderHomeBoard(); updateDots();
-    showToast("既読にしました");
   }
 }
 function delBoard(id){
@@ -1242,9 +1260,12 @@ function renderHomeBoard(){
   var c=document.getElementById("homeBoard"); c.innerHTML="";
   if(!boardData.length){ c.innerHTML="<div style='color:var(--sub);font-size:13px;text-align:center;padding:8px'>"+t("noBoard")+"</div>"; return; }
   boardData.slice(0,2).forEach(function(b){
-    var el=document.createElement("div"); el.className="bi"+(b.isNew?" ni2":""); el.style.cursor="pointer";
+    var readBy=b.readBy||[];
+    if(!Array.isArray(readBy)) readBy=Object.values(readBy);
+    var isUnread=readBy.indexOf(hUser.name)<0;
+    var el=document.createElement("div"); el.className="bi"+(isUnread?" ni2":""); el.style.cursor="pointer";
     el.onclick=function(){ showPage("board"); };
-    var nb=b.isNew?"<span class='bb'>"+t("newBadge")+"</span>":"";
+    var nb=isUnread?"<span class='bb'>"+t("newBadge")+"</span>":"";
     el.innerHTML="<div style='font-weight:600'>"+b.title+nb+"</div><div class='ba'>"+b.author+" ・ "+b.time+"</div>";
     c.appendChild(el);
   });
