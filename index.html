@@ -12,6 +12,7 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Noto Sans JP',sans-serif;background:#f5f5f5;font-size:15px}
@@ -154,6 +155,15 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
       <div class="sb"><div class="sn" style="color:var(--gold)" id="unreadCnt">0</div><div class="sl" id="l-unread">未読メッセージ</div></div>
       <div class="sb"><div class="sn" id="todayCnt">0</div><div class="sl" id="l-today">今日の予定</div></div>
       <div class="sb"><div class="sn" style="color:var(--gr)" id="staffCountNum">30</div><div class="sl" id="l-staff2">スタッフ数</div></div>
+    </div>
+  </div>
+  <div class="card" id="notifyCard">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px">
+        <div style="font-weight:700;font-size:14px;color:var(--navy)">🔔 プッシュ通知</div>
+        <div id="notifyStatus" style="font-size:12px;color:var(--sub);margin-top:3px;line-height:1.5">予定の追加・安否確認の開始をこの端末に通知します</div>
+      </div>
+      <button class="btn bsm bg" id="notifyBtn" onclick="enablePush(false)">🔔 通知を受け取る</button>
     </div>
   </div>
   <div class="card">
@@ -434,6 +444,89 @@ function listenAll(){
   });
 }
 
+// ===== プッシュ通知 =====
+var VAPID_KEY="BFpSznDnsIyxGJu-lDbElVdaB7_kmFYDz6FXHd55m8JbTxWRHVpNnh5fwTzh_-yXZjHkYJuj_6VOZG64SS9Me3k";
+var NOTIFY_ENDPOINT="https://higashiomi-app-bnip.vercel.app/api/send-notification";
+function pushSupported(){
+  return ("serviceWorker" in navigator) && ("Notification" in window) && ("PushManager" in window) &&
+    typeof firebase!=="undefined" && firebase.messaging && (!firebase.messaging.isSupported || firebase.messaging.isSupported());
+}
+function isIOS(){ return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1); }
+function isStandalone(){ return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone===true; }
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function updateNotifyUI(msg){
+  var st=document.getElementById("notifyStatus"), btn=document.getElementById("notifyBtn");
+  if(!st||!btn) return;
+  if(msg){ st.textContent=msg; }
+  if(isIOS() && !isStandalone()){
+    st.textContent="iPhoneは、Safariの共有ボタン（□↑）→「ホーム画面に追加」で追加したアイコンから開くと通知を受け取れます";
+    btn.style.display="none"; return;
+  }
+  if(!pushSupported()){ st.textContent="この端末・ブラウザは通知に対応していません"; btn.style.display="none"; return; }
+  var perm=Notification.permission;
+  if(perm==="denied"){
+    st.textContent="通知がブロックされています。ブラウザ（またはスマホ）の設定でこのサイトの通知を「許可」にしてください";
+    btn.style.display="none";
+  } else if(perm==="granted" && lsGet("pushKey")===safeKey(hUser.name)){
+    if(!msg) st.textContent="✅ この端末で通知を受け取ります（"+hUser.name+"）";
+    btn.textContent="🔄 再登録"; btn.className="btn bsm bo"; btn.style.display="inline-block";
+  } else {
+    if(!msg) st.textContent="予定の追加・安否確認の開始をこの端末に通知します";
+    btn.textContent="🔔 通知を受け取る"; btn.className="btn bsm bg"; btn.style.display="inline-block";
+  }
+}
+var _swReg=null;
+function enablePush(silent){
+  if(!pushSupported()){ updateNotifyUI(); if(!silent) showToast("この端末は通知に対応していません"); return; }
+  if(!db){ if(!silent) showToast("サーバーに接続できません"); return; }
+  var ask = silent ? Promise.resolve(Notification.permission) : Notification.requestPermission();
+  Promise.resolve(ask).then(function(perm){
+    if(perm!=="granted"){ updateNotifyUI(); if(!silent) showToast("通知が許可されませんでした"); return; }
+    return navigator.serviceWorker.register("firebase-messaging-sw.js").then(function(reg){
+      _swReg=reg;
+      return firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+    }).then(function(token){
+      if(!token) throw new Error("token");
+      var key=safeKey(hUser.name), oldKey=lsGet("pushKey");
+      var jobs=[db.ref("pushTokens/"+key).set(token)];
+      if(oldKey && oldKey!==key) jobs.push(db.ref("pushTokens/"+oldKey).remove());
+      return Promise.all(jobs).then(function(){
+        lsSet("pushKey",key);
+        updateNotifyUI();
+        if(!silent) showToast("🔔 通知を有効にしました");
+      });
+    });
+  }).catch(function(e){
+    console.log("push error",e);
+    updateNotifyUI("通知の登録に失敗しました。時間をおいて「通知を受け取る」をもう一度押してください");
+    if(!silent) showToast("通知の登録に失敗しました");
+  });
+}
+// 出来事（予定追加・安否確認開始）を送信APIに知らせる。文面はサーバー側でデータベースから作る
+function notifyEvent(payload){
+  try{
+    payload.fromKey=safeKey(hUser.name);
+    fetch(NOTIFY_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
+      .then(function(r){ return r.json(); })
+      .then(function(j){ console.log("notify",j); })
+      .catch(function(e){ console.log("notify error",e); });
+  }catch(e){}
+}
+function initPush(){
+  updateNotifyUI();
+  if(!pushSupported()) return;
+  // アプリ表示中に届いた通知はトーストで知らせる
+  try{
+    firebase.messaging().onMessage(function(p){
+      var d=(p&&p.data)||{};
+      if(d.title) showToast(d.title);
+    });
+  }catch(e){}
+  // 許可済みの端末は起動時に登録を更新（トークンの入れ替わり対策）
+  if(Notification.permission==="granted" && lsGet("pushKey")) enablePush(true);
+}
+
 // ===== 安否確認 =====
 var SAFETY_ADMINS=["吉田 尚未","近藤 竜二"]; // 安否確認の送信・終了・集計ができる人
 function normName(n){ return String(n||"").replace(/[\s　]/g,""); }
@@ -561,6 +654,7 @@ function sendAnpiEvent(){
   db.ref("anpiData").set(data).then(function(){
     closeAnpiModal();
     showToast("📨 安否確認を送信しました");
+    notifyEvent({event:"anpi"});
   }).catch(function(e){
     showToast("送信に失敗しました："+((e&&e.message)||""));
   });
@@ -589,12 +683,15 @@ function submitAnpi(status){
 
 // ===== データ保存 =====
 function saveData(){
+  var p=Promise.resolve();
   if(db){
     try{
-      db.ref("schedData").set(schedData);
-      db.ref("boardData").set(boardData);
-      db.ref("survData").set(survData);
-      db.ref("staffData").set(staff);
+      p=Promise.all([
+        db.ref("schedData").set(schedData),
+        db.ref("boardData").set(boardData),
+        db.ref("survData").set(survData),
+        db.ref("staffData").set(staff)
+      ]);
     }catch(e){}
   }
   // ローカルにも保存（オフライン対策）
@@ -604,6 +701,7 @@ function saveData(){
     localStorage.setItem("surv2", JSON.stringify(survData));
     localStorage.setItem("staff2", JSON.stringify(staff));
   }catch(e){}
+  return p;
 }
 function safeKey(n){ try{ return btoa(unescape(encodeURIComponent(n))).replace(/\+/g,'_').replace(/\//g,'-').replace(/=/g,''); }catch(e){ return 'u'+n.length; } }
 function saveFileData(){
@@ -972,7 +1070,7 @@ function submitModal(){
     if(v){ hUser.name=v.split("|")[0]; hUser.dept=document.getElementById("fhdept").value||hUser.dept; }
     else { hUser.dept=document.getElementById("fhdept").value||hUser.dept; }
     hUser.ini=document.getElementById("fhini").value||hUser.ini;
-    applyUser(); saveUser(); renderAnpi(); showToast(t("updated"));
+    applyUser(); saveUser(); renderAnpi(); if(lsGet("pushKey")&&window.Notification&&Notification.permission==="granted") enablePush(true); else updateNotifyUI(); showToast(t("updated"));
   } else if(modalMode==="editsched"){
     var ds=document.getElementById("feschedds").value;
     var id=parseInt(document.getElementById("feschedid").value);
@@ -1014,9 +1112,10 @@ function submitModal(){
         if(extras.length>0) memberStr=mb+"、"+extras.join("、");
       }
     }
-    schedData[d].push({id:schedIdCounter,st:st,et:en,title:ti,member:memberStr,poster:hUser.name});
+    var newId=Date.now();
+    schedData[d].push({id:newId,st:st,et:en,title:ti,member:memberStr,poster:hUser.name,createdAt:newId});
     schedData[d].sort(function(a,b){ return a.st>b.st?1:-1; });
-    saveData();
+    saveData().then(function(){ notifyEvent({event:"sched",date:d,id:newId}); });
     if(!dbReady){ if(selDate===d) renderDayDetail(d); renderCal(); renderTodaySlots(); updateDots(); }
     showToast(t("added"));
   } else if(modalMode==="editboard"){
@@ -1739,7 +1838,14 @@ loadRules();
 // Firebase SDKロード後に初期化
 window.addEventListener('load', function(){
   initFirebase();
+  initPush();
+  openPageFromHash();
 });
+function openPageFromHash(){
+  var h=(location.hash||"").replace("#","");
+  if(h && document.getElementById("pg-"+h) && document.getElementById("n-"+h)) showPage(h);
+}
+window.addEventListener('hashchange', openPageFromHash);
 
 // Firebase接続状態表示
 if(typeof firebase !== "undefined"){

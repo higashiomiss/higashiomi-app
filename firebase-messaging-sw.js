@@ -13,30 +13,46 @@ firebase.initializeApp({
 });
 
 var messaging = firebase.messaging();
+var APP_URL = "https://higashiomiss.github.io/higashiomi-app/";
 
 // アプリを閉じている・バックグラウンドのときに通知を受け取ったら表示する
 messaging.onBackgroundMessage(function (payload) {
-  var title =
-    (payload.notification && payload.notification.title) ||
-    (payload.data && payload.data.title) ||
-    "🚨 安否確認";
-  var body =
-    (payload.notification && payload.notification.body) ||
-    (payload.data && payload.data.body) ||
-    "";
+  var d = payload.data || {};
+  var n = payload.notification || {};
+  var title = d.title || n.title || "東近江製作所 TeamNavi";
+  var body = d.body || n.body || "";
+  var urgent = d.urgent === "1";
 
-// アプリを閉じていてもホーム画面アイコンにバッジ（数字）を表示する
+  // ホーム画面アイコンにバッジ（対応端末のみ）
   try {
     if (self.navigator && self.navigator.setAppBadge) {
       self.navigator.setAppBadge(1).catch(function () {});
     }
   } catch (e) {}
-  
-  self.registration.showNotification(title, {
-                                body: body,
-                                tag: "safety-check",
-                                renotify: true,
-                                requireInteraction: true,
-                                vibrate: [200, 100, 200, 100, 200]
-                              });
+
+  return self.registration.showNotification(title, {
+    body: body,
+    tag: d.tag || "teamnavi",
+    renotify: true,
+    requireInteraction: urgent,
+    vibrate: urgent ? [200, 100, 200, 100, 200] : [200],
+    data: { url: (d.url || APP_URL) + (d.page ? "#" + d.page : "") }
+  });
+});
+
+// 通知をタップしたらアプリを開く（開いていればそのタブを前に出す）
+self.addEventListener("notificationclick", function (event) {
+  event.notification.close();
+  var url = (event.notification.data && event.notification.data.url) || APP_URL;
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (list) {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].url.indexOf(APP_URL) === 0 && "focus" in list[i]) {
+          if ("navigate" in list[i]) list[i].navigate(url);
+          return list[i].focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(url);
+    })
+  );
 });
