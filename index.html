@@ -430,19 +430,19 @@ function renderAnpi(){
   var userPanel=document.getElementById("anpiUserPanel");
   var noEvent=document.getElementById("anpiNoEvent");
   var resultList=document.getElementById("anpiResultList");
-  var adminBtn=document.getElementById("anpiAdminBtn");
   if(!userPanel) return;
 
   // 管理者ボタン
-  if(adminBtn){
+  var adminArea=document.getElementById("anpiAdminArea");
+  var sendBtn=document.getElementById("anpiSendBtn");
+  var endBtn=document.getElementById("anpiEndBtn");
+  if(adminArea){
     if(hUser.name===ADMIN_NAME){
-      if(active){
-        adminBtn.innerHTML='<button onclick="closeAnpiEvent()" style="background:#e74c3c;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:13px;cursor:pointer;margin-left:8px">■ 終了</button>';
-      } else {
-        adminBtn.innerHTML='<button onclick="openAnpiModal()" style="background:#e74c3c;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:13px;cursor:pointer;margin-left:8px">＋ 送信</button>';
-      }
+      adminArea.style.display="flex";
+      if(sendBtn) sendBtn.style.display=active?"none":"inline-block";
+      if(endBtn) endBtn.style.display=active?"inline-block":"none";
     } else {
-      adminBtn.innerHTML='';
+      adminArea.style.display="none";
     }
   }
 
