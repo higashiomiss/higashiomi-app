@@ -1052,22 +1052,31 @@ function buildDeptFilters(){
   // 現在の選択値を維持
   sel.value=schedFilter||"all";
 }
+// 予定の参加者：「全員」→ ALL、空欄 → 登録した人、それ以外 → 「、」「,」区切りの名前
+function schedPeople(s){
+  var m=String((s&&s.member)||"").trim();
+  if(m==="全員") return "ALL";
+  if(!m) return s&&s.poster?[s.poster]:[];
+  return m.split(/[、,，]/).map(function(x){ return x.trim(); }).filter(function(x){ return x; });
+}
+function schedHas(s,names){
+  var ppl=schedPeople(s);
+  if(ppl==="ALL") return true;
+  var want=names.map(normName);
+  return ppl.some(function(x){ return want.indexOf(normName(x))>=0; });
+}
 function getFilteredSched(ds){
   var raw=schedData[ds];
   var data=raw ? (Array.isArray(raw) ? raw : Object.values(raw)) : [];
-  if(schedFilter==="all") return data;
-  if(schedFilter==="me") return data.filter(function(s){
-    return !s.member||s.member===""||s.member==="全員"||s.member.indexOf(hUser.name)>=0;
-  });
-  if(schedFilter.indexOf("dept:")===0){
+  data=data.filter(function(x){ return x; });
+  if(!schedFilter || schedFilter==="all") return data;
+  var names;
+  if(schedFilter==="me") names=[hUser.name];
+  else if(schedFilter.indexOf("dept:")===0){
     var dept=schedFilter.slice(5);
-    var deptMembers=staff.filter(function(s){ return s.dept===dept; }).map(function(s){ return s.name; });
-    return data.filter(function(s){
-      if(!s.member||s.member==="全員") return true;
-      return deptMembers.some(function(nm){ return s.member.indexOf(nm)>=0; });
-    });
-  }
-  return data;
+    names=staff.filter(function(s){ return s.dept===dept; }).map(function(s){ return s.name; });
+  } else names=[schedFilter];
+  return data.filter(function(s){ return schedHas(s,names); });
 }
 function showPage(pg){
   document.querySelectorAll(".pg").forEach(function(p){ p.classList.remove("on"); });
@@ -1626,7 +1635,8 @@ function renderCal(){
       var daySpan=document.createElement("span"); daySpan.textContent=d; el.appendChild(daySpan);
       var ev=getFilteredSched(ds); if(ev.length){
         ev.forEach(function(s){
-          var members=(s.member&&s.member!=="")?s.member.split(",").map(function(x){return x.trim();}).filter(function(x){return x;}):(s.poster?[s.poster]:[]);
+          var ppl=schedPeople(s);
+          var members=ppl==="ALL"?["全員"]:ppl;
           if(members.length>0){
             var chip=document.createElement("span"); chip.className="cal-chip";
             chip.textContent=members[0]+(members.length>1?" +他"+(members.length-1)+"名":"");
@@ -1676,7 +1686,7 @@ function renderDayDetail(ds){
   document.getElementById("dayTitle").textContent=lang==="ja"?"📅 "+parts[1]+"月"+parts[2]+"日（"+dow+"）":"📅 Ngày "+parts[2]+"/"+parts[1]+" ("+dow+")";
   var slots=document.getElementById("daySlots"), noEl=document.getElementById("noSched");
   noEl.textContent=t("noSched");
-  var data=schedData[ds]||[];
+  var data=getFilteredSched(ds);
   if(!data.length){ slots.innerHTML=""; noEl.style.display="block"; return; }
   noEl.style.display="none"; slots.innerHTML="";
   data.forEach(function(s){
