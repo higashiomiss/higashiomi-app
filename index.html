@@ -439,6 +439,7 @@ function listenAll(){
   // 安否確認リスナー
   db.ref("anpiData").on("value",function(snap){
     anpiData=snap.val()||{active:false,desc:"",responses:{}};
+    _anpiLoaded=true;
     if(!anpiData.responses) anpiData.responses={};
     renderAnpi();
   });
@@ -529,6 +530,38 @@ function initPush(){
   // 許可済みの端末は起動時に登録を更新（トークンの入れ替わり対策）
   if(Notification.permission==="granted" && lsGet("pushKey")) enablePush(true);
 }
+// ===== 通知の自動消去 =====
+// 条件に合う通知を閉じ、残りが無ければホーム画面アイコンのバッジも消す
+function closeNotifs(test){
+  try{
+    if(!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.getRegistration().then(function(reg){
+      if(!reg || !reg.getNotifications) return;
+      return reg.getNotifications().then(function(list){
+        list.forEach(function(n){ if(test(n.tag||"")) n.close(); });
+        return reg.getNotifications();
+      }).then(function(rest){
+        if(rest && rest.length===0 && navigator.clearAppBadge) navigator.clearAppBadge().catch(function(){});
+      });
+    }).catch(function(){});
+  }catch(e){}
+}
+function clearSchedNotifs(){ closeNotifs(function(t){ return t.indexOf("sched-")===0; }); }
+function clearAnpiNotifs(){ closeNotifs(function(t){ return t.indexOf("anpi-")===0 || t==="safety-check"; }); }
+var _anpiLoaded=false;
+// 画面を見ているときに「既読」にあたるものを消す
+function syncNotifs(){
+  if(document.visibilityState!=="visible") return;
+  // 予定：スケジュール画面を開いたら消す
+  if(curPg==="schedule") clearSchedNotifs();
+  // 安否確認：自分が回答済み、または安否確認が終了していたら消す（データ読込後のみ判定）
+  if(_anpiLoaded){
+    var a=anpiData||{};
+    var answered=a.responses && a.responses[safeKey(hUser.name)];
+    if(!a.active || answered) clearAnpiNotifs();
+  }
+}
+document.addEventListener("visibilitychange", syncNotifs);
 
 // ===== 安否確認 =====
 var SAFETY_ADMINS=["吉田 尚未","近藤 竜二"]; // 安否確認の送信・終了・集計ができる人
@@ -540,6 +573,7 @@ function isSafetyAdmin(){
 function anpiStatusText(st){ return st==="safe"?"✅ 安全です":st==="unsafe"?"🚨 助けが必要":"🏠 自宅待機"; }
 function renderAnpi(){
   updateDots();
+  syncNotifs();
   var active=!!(anpiData&&anpiData.active);
   var admin=isSafetyAdmin();
   var userPanel=document.getElementById("anpiUserPanel");
@@ -678,6 +712,7 @@ function submitAnpi(status){
   var resp={name:hUser.name,status:status,time:new Date().toLocaleString("ja-JP")};
   db.ref("anpiData/responses/"+safeKey(hUser.name)).set(resp).then(function(){
     showToast(anpiStatusText(status)+" で回答しました");
+    clearAnpiNotifs();
   }).catch(function(e){
     showToast("回答に失敗しました："+((e&&e.message)||""));
   });
@@ -916,6 +951,7 @@ function showPage(pg){
   document.getElementById("n-"+pg).classList.add("on");
   curPg=pg;
   if(pg==="anpi") renderAnpi();
+  syncNotifs();
 }
 function onFab(){
   if(curPg==="schedule") openAddSched();

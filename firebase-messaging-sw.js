@@ -42,7 +42,9 @@ messaging.onBackgroundMessage(function (payload) {
 
 // 通知をタップしたらアプリを開く（開いていればそのタブを前に出す）
 self.addEventListener("notificationclick", function (event) {
-  event.notification.close();
+  var tag = event.notification.tag || "";
+  // 安否確認は回答するまで残す（回答するとアプリ側で自動的に消える）
+  if (tag.indexOf("anpi-") !== 0) event.notification.close();
   var url = (event.notification.data && event.notification.data.url) || APP_URL;
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (list) {
