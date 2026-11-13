@@ -1244,13 +1244,33 @@ function submitModal(){
     var mb=document.getElementById("femember").value;
     if(!ti){ showToast(t("needContent")); return; }
     if(st>=en){ showToast(t("timeErr")); return; }
+    var nd=(document.getElementById("fedate")||{}).value||ds;
     var data=schedData[ds]||[];
+    if(!Array.isArray(data)) data=Object.values(data);
     var s=data.find(function(x){ return x.id===id; });
-    if(s){ s.st=st; s.et=en; s.title=ti; s.member=mb; }
-    data.sort(function(a,b){ return a.st>b.st?1:-1; });
+    if(!s){ showToast("予定が見つかりません。画面を更新してください"); return; }
+    s.st=st; s.et=en; s.title=ti; s.member=mb;
+    var bySt=function(a,b){ return a.st>b.st?1:-1; };
+    if(nd!==ds){
+      // 元の日から外す（その日の予定が無くなったら日付ごと消す）
+      var rest=data.filter(function(x){ return x.id!==id; });
+      if(rest.length) schedData[ds]=rest; else delete schedData[ds];
+      // 新しい日に追加
+      var nl=schedData[nd]||[];
+      if(!Array.isArray(nl)) nl=Object.values(nl);
+      nl.push(s); nl.sort(bySt); schedData[nd]=nl;
+    } else {
+      data.sort(bySt); schedData[ds]=data;
+    }
     saveData();
-    if(!dbReady){ renderDayDetail(ds); renderCal(); renderTodaySlots(); }
-    showToast(t("updated"));
+    if(nd!==ds){
+      var np=nd.split("-"); calY=parseInt(np[0]); calM=parseInt(np[1]);
+      selectDay(nd); renderTodaySlots(); updateDots();
+      showToast("予定を "+parseInt(np[1])+"/"+parseInt(np[2])+" に移動しました");
+    } else {
+      if(!dbReady){ renderDayDetail(ds); renderCal(); renderTodaySlots(); }
+      showToast(t("updated"));
+    }
   } else if(modalMode==="sched"){
     var d=document.getElementById("fdate").value;
     var ti=document.getElementById("ftitle").value.trim();
@@ -1632,6 +1652,7 @@ function openEditSched(ds, id){
   document.getElementById("modalBody").innerHTML=
     "<input type='hidden' id='feschedds' value='"+ds+"'>"+
     "<input type='hidden' id='feschedid' value='"+id+"'>"+
+    "<div class='fg'><label class='fl'>"+t("dateLbl")+"</label><input class='fi' type='date' id='fedate' value='"+ds+"'></div>"+
     "<div class='fg'><label class='fl'>"+t("startLbl")+"</label><select class='fi' id='festart'>"+timeOpts(s.st)+"</select></div>"+
     "<div class='fg'><label class='fl'>"+t("endLbl")+"</label><select class='fi' id='feend'>"+timeOpts(s.et||"10:00")+"</select></div>"+
     "<div class='fg'><label class='fl'>"+t("contentLbl")+"</label><input class='fi' id='fetitle' value='"+s.title+"'></div>"+
@@ -1639,7 +1660,13 @@ function openEditSched(ds, id){
   // 担当者を選択状態に
   setTimeout(function(){
     var sel=document.getElementById("femember");
-    if(sel && s.member){ sel.value=s.member; }
+    if(sel && s.member){
+      sel.value=s.member;
+      if(sel.value!==s.member){
+        var op=document.createElement("option"); op.value=s.member; op.textContent=s.member;
+        sel.appendChild(op); sel.value=s.member;
+      }
+    }
   },50);
   document.getElementById("modal").classList.add("on");
 }
