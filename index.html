@@ -269,7 +269,10 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
   </div>
   <div id="anpiNoEvent" style="text-align:center;color:var(--sub);padding:30px;font-size:14px">現在、安否確認は実施されていません</div>
   <div id="anpiResultList" style="display:none">
-    <div style="font-size:13px;font-weight:700;color:var(--sub);margin-bottom:8px" id="anpiResultTitle"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:700;color:var(--sub)" id="anpiResultTitle"></div>
+      <button id="anpiClearBtn" class="btn bsm bo" style="display:none;border-color:var(--red);color:var(--red)" onclick="clearAnpiResult()">🗑 結果を消去</button>
+    </div>
     <div id="anpiResultRows"></div>
   </div>
 </div>
@@ -592,6 +595,8 @@ function renderAnpi(){
     if(endBtn) endBtn.style.display=active?"inline-block":"none";
   }
   if(hint) hint.style.display=admin?"block":"none";
+  var clearBtn=document.getElementById("anpiClearBtn");
+  if(clearBtn) clearBtn.style.display=(admin && !active && anpiData && anpiData.sentAt)?"inline-block":"none";
 
   // ホーム画面バナー
   var homeBanner=document.getElementById("anpiHomeBanner");
@@ -704,6 +709,17 @@ function closeAnpiEvent(){
     showToast("安否確認を終了しました");
   }).catch(function(e){
     showToast("終了に失敗しました："+((e&&e.message)||""));
+  });
+}
+function clearAnpiResult(){
+  if(!isSafetyAdmin()){ showToast("結果の消去は管理者のみです"); return; }
+  if(anpiData && anpiData.active){ showToast("実施中の安否確認は消去できません。先に終了してください"); return; }
+  if(!db){ showToast("サーバーに接続できません。通信を確認してください"); return; }
+  if(!confirm("前回の安否確認の結果を消去しますか？\n消去した結果は元に戻せません。")) return;
+  db.ref("anpiData").set({active:false,desc:"",responses:{},clearedAt:Date.now(),clearedBy:hUser.name}).then(function(){
+    showToast("🗑 前回の結果を消去しました");
+  }).catch(function(e){
+    showToast("消去に失敗しました："+((e&&e.message)||""));
   });
 }
 function submitAnpi(status){
