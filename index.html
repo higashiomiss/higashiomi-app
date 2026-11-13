@@ -104,6 +104,19 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 .sync-bar{background:#e8f5ee;border-radius:8px;padding:6px 12px;font-size:12px;color:#2a7a4a;text-align:center;margin-bottom:8px;display:none}
 .filt-btn{background:#f0f4ff;border:1.5px solid var(--bd);border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--sub);white-space:nowrap}
 .filt-btn.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.aq{margin-bottom:12px}
+.aq-t{font-weight:700;font-size:14px;color:#1a1a2e;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.aq-done{font-size:11px;font-weight:700;color:#2a7a4a;background:#e8f5ee;border-radius:10px;padding:1px 8px}
+.aq-todo{font-size:11px;font-weight:700;color:#b45309;background:#fff1d6;border-radius:10px;padding:1px 8px}
+.aq-g{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.aq-b{display:flex;align-items:center;gap:6px;text-align:left;padding:11px 10px;border:1.5px solid #d9dde8;border-radius:9px;background:#fff;font-size:14px;font-family:inherit;cursor:pointer;color:#1a1a2e;line-height:1.3;min-height:48px}
+.aq-b .ic{font-size:18px;flex-shrink:0}
+.aq-b.on{color:#fff;font-weight:700;border-color:transparent}
+.aq-chip{display:inline-block;font-size:11px;border-radius:5px;padding:1px 6px;margin:2px 4px 0 0;background:#f0f2f7;color:#444}
+.aq-chip.warn{background:#fdecea;color:#c0392b;font-weight:700}
+.aq-sum{background:#fff;border:1px solid #eee;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;line-height:1.9}
+.aq-sum b{color:var(--navy)}
+@media(max-width:360px){.aq-g{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -259,12 +272,8 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
     <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:14px;margin-bottom:14px;font-size:14px;line-height:1.6">
       <div style="font-weight:700;font-size:15px;margin-bottom:6px">🆘 安否確認が届いています</div>
       <div id="anpiEventDesc" style="color:#555;margin-bottom:12px"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button onclick="submitAnpi('safe')" style="flex:1;min-width:90px;padding:14px 8px;background:#2ecc71;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">✅ 安全です</button>
-        <button onclick="submitAnpi('unsafe')" style="flex:1;min-width:90px;padding:14px 8px;background:#e74c3c;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">🚨 助けが必要</button>
-        <button onclick="submitAnpi('home')" style="flex:1;min-width:90px;padding:14px 8px;background:#3498db;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">🏠 自宅待機</button>
-      </div>
-      <div id="anpiMyStatus" style="margin-top:10px;font-size:13px;color:#666"></div>
+      <div id="anpiQuestions"></div>
+      <div id="anpiMyStatus" style="margin-top:4px;font-size:13px;color:#666"></div>
     </div>
   </div>
   <div id="anpiNoEvent" style="text-align:center;color:var(--sub);padding:30px;font-size:14px">現在、安否確認は実施されていません</div>
@@ -560,7 +569,7 @@ function syncNotifs(){
   // 安否確認：自分が回答済み、または安否確認が終了していたら消す（データ読込後のみ判定）
   if(_anpiLoaded){
     var a=anpiData||{};
-    var answered=a.responses && a.responses[safeKey(hUser.name)];
+    var answered=anpiComplete(a.responses && a.responses[safeKey(hUser.name)]);
     if(!a.active || answered) clearAnpiNotifs();
   }
 }
@@ -573,7 +582,69 @@ function isSafetyAdmin(){
   var me=normName(hUser&&hUser.name);
   return SAFETY_ADMINS.some(function(a){ return normName(a)===me; });
 }
-function anpiStatusText(st){ return st==="safe"?"✅ 安全です":st==="unsafe"?"🚨 助けが必要":"🏠 自宅待機"; }
+// 安否確認の質問（4問）。key は保存する項目名、opts は [値, アイコン, 文言, 選択時の色, 要注意]
+var ANPI_Q=[
+  {key:"status",title:"① あなた自身のケガ・体調",opts:[
+    ["ok","🟢","無事（ケガなし）","#2e9e5b"],
+    ["minor","🟡","軽傷（自力で動ける）","#d4a106",1],
+    ["severe","🔴","重傷・救助が必要","#e74c3c",1]]},
+  {key:"family",title:"② 家族・同居人の状況",opts:[
+    ["ok","👨‍👩‍👧‍👦","家族も全員無事","#2e9e5b"],
+    ["hurt","🩹","家族にケガ・被害あり","#e74c3c",1],
+    ["unknown","❓","家族と連絡が取れない","#e67e22",1],
+    ["single","👤","単身（同居人なし）","#5a6480"]]},
+  {key:"place",title:"③ 現在の居場所・避難状況",opts:[
+    ["home","🏠","自宅にいる","#1a3a7a"],
+    ["office","🏢","会社・出先にいる","#1a3a7a"],
+    ["shelter","🏫","避難所にいる","#1a3a7a"],
+    ["moving","🚗","移動中・車中","#1a3a7a"]]},
+  {key:"work",title:"④ 出社・業務の可否",opts:[
+    ["ok","💻","出社・業務が可能","#2e9e5b"],
+    ["late","⏳","遅れるが可能（交通機関の乱れ等）","#d4a106"],
+    ["remote","🏠","在宅勤務なら可能","#3498db"],
+    ["no","🚫","出社・業務は困難","#e74c3c",1]]}
+];
+// 以前の3択の回答（安全／助けが必要／自宅待機）も読めるようにする
+function anpiNorm(r){
+  if(!r) return null;
+  var o={}; for(var k in r) o[k]=r[k];
+  if(o.status==="safe"||o.status==="home") o.status="ok";
+  if(o.status==="unsafe") o.status="severe";
+  return o;
+}
+function anpiOpt(qkey,val){
+  for(var i=0;i<ANPI_Q.length;i++) if(ANPI_Q[i].key===qkey)
+    for(var j=0;j<ANPI_Q[i].opts.length;j++) if(ANPI_Q[i].opts[j][0]===val) return ANPI_Q[i].opts[j];
+  return null;
+}
+function anpiRemain(r){ r=anpiNorm(r); return ANPI_Q.filter(function(q){ return !(r&&r[q.key]); }).length; }
+function anpiComplete(r){ return !!r && anpiRemain(r)===0; }
+function myAnpiResp(){ return anpiData&&anpiData.responses ? anpiData.responses[safeKey(hUser.name)] : null; }
+function renderAnpiForm(){
+  var box=document.getElementById("anpiQuestions"); if(!box) return;
+  var r=anpiNorm(myAnpiResp())||{};
+  box.innerHTML="";
+  ANPI_Q.forEach(function(q){
+    var wrap=document.createElement("div"); wrap.className="aq";
+    var t=document.createElement("div"); t.className="aq-t";
+    var tt=document.createElement("span"); tt.textContent=q.title; t.appendChild(tt);
+    var badge=document.createElement("span"); badge.className=r[q.key]?"aq-done":"aq-todo"; badge.textContent=r[q.key]?"回答済み":"未回答";
+    t.appendChild(badge); wrap.appendChild(t);
+    var g=document.createElement("div"); g.className="aq-g";
+    q.opts.forEach(function(o){
+      var b=document.createElement("button"); b.type="button";
+      var on=r[q.key]===o[0];
+      b.className="aq-b"+(on?" on":"");
+      if(on) b.style.background=o[3];
+      var ic=document.createElement("span"); ic.className="ic"; ic.textContent=o[1];
+      var tx=document.createElement("span"); tx.textContent=o[2];
+      b.appendChild(ic); b.appendChild(tx);
+      b.onclick=function(){ answerAnpi(q.key,o[0]); };
+      g.appendChild(b);
+    });
+    wrap.appendChild(g); box.appendChild(wrap);
+  });
+}
 function renderAnpi(){
   updateDots();
   syncNotifs();
@@ -602,9 +673,9 @@ function renderAnpi(){
   var homeBanner=document.getElementById("anpiHomeBanner");
   var homeBannerDesc=document.getElementById("anpiHomeBannerDesc");
   if(homeBanner){
-    var answered0=active&&anpiData.responses&&anpiData.responses[safeKey(hUser.name)];
-    homeBanner.style.display=(active&&!answered0)?"block":"none";
-    if(homeBannerDesc) homeBannerDesc.textContent=active?(anpiData.desc||""):"";
+    var mine0=active?myAnpiResp():null;
+    homeBanner.style.display=(active&&!anpiComplete(mine0))?"block":"none";
+    if(homeBannerDesc) homeBannerDesc.textContent=active?((anpiData.desc||"")+(mine0?"（回答途中：あと"+anpiRemain(mine0)+"問）":"")):"";
   }
 
   if(!active){
@@ -621,9 +692,14 @@ function renderAnpi(){
   var descEl=document.getElementById("anpiEventDesc");
   if(descEl) descEl.textContent=anpiData.desc||"";
 
+  renderAnpiForm();
   var myStatus=document.getElementById("anpiMyStatus");
-  var myResp=anpiData.responses[safeKey(hUser.name)];
-  if(myStatus) myStatus.textContent=myResp?("回答済み："+anpiStatusText(myResp.status)+"（"+(myResp.time||"")+"）　※押し直すと変更できます"):"まだ回答していません";
+  var myResp=myAnpiResp();
+  if(myStatus){
+    if(anpiComplete(myResp)) myStatus.textContent="✅ 回答が完了しました（"+(myResp.time||"")+"）　※押し直すと変更できます";
+    else if(myResp) myStatus.textContent="回答途中です。あと"+anpiRemain(myResp)+"問、答えてください（押すとすぐ保存されます）";
+    else myStatus.textContent="4つの質問に答えてください（押すとすぐ保存されます）";
+  }
 
   if(admin) renderAnpiResults("📋 回答状況");
   else resultList.style.display="none";
@@ -635,42 +711,72 @@ function renderAnpiResults(label){
   if(!resultList||!rows) return;
   resultList.style.display="block";
   var resp=(anpiData&&anpiData.responses)||{};
-  var byStatus={safe:[],unsafe:[],home:[],none:[]};
-  var answered=0;
+  var groups={severe:[],minor:[],ok:[],partial:[],none:[]};
+  var counts={}; ANPI_Q.forEach(function(q){ counts[q.key]={}; });
+  var done=0, started=0;
   staff.forEach(function(s){
-    var r=resp[safeKey(s.name)];
-    if(!r){ byStatus.none.push({name:s.name}); return; }
-    answered++;
-    var k=(r.status==="safe"||r.status==="unsafe")?r.status:"home";
-    byStatus[k].push({name:s.name,time:r.time||""});
+    var r=anpiNorm(resp[safeKey(s.name)]);
+    if(!r){ groups.none.push({name:s.name}); return; }
+    started++; if(anpiComplete(r)) done++;
+    ANPI_Q.forEach(function(q){ if(r[q.key]) counts[q.key][r[q.key]]=(counts[q.key][r[q.key]]||0)+1; });
+    var g=(r.status==="severe"||r.status==="minor"||r.status==="ok")?r.status:"partial";
+    groups[g].push({name:s.name,r:r});
   });
   var sentInfo="";
   if(anpiData.sentAt){
     var d=new Date(anpiData.sentAt);
     sentInfo="　送信："+(d.getMonth()+1)+"/"+d.getDate()+" "+pad(d.getHours())+":"+pad(d.getMinutes())+(anpiData.sentBy?"（"+anpiData.sentBy+"）":"");
   }
-  if(titleEl) titleEl.textContent=label+"："+answered+"/"+staff.length+"名"+sentInfo;
+  if(titleEl) titleEl.textContent=label+"：回答完了 "+done+"/"+staff.length+"名"+(started>done?"（途中 "+(started-done)+"名）":"")+sentInfo;
   rows.innerHTML="";
-  var groups=[
-    {key:"unsafe",label:"🚨 助けが必要",color:"#e74c3c"},
-    {key:"safe",label:"✅ 安全",color:"#2ecc71"},
-    {key:"home",label:"🏠 自宅待機",color:"#3498db"},
+
+  // 質問ごとの集計
+  var sum=document.createElement("div"); sum.className="aq-sum";
+  ANPI_Q.forEach(function(q){
+    var line=document.createElement("div");
+    var b=document.createElement("b"); b.textContent=q.title.replace(/^[①-④]\s*/,"")+"："; line.appendChild(b);
+    q.opts.forEach(function(o){
+      var c=counts[q.key][o[0]]||0;
+      var sp=document.createElement("span"); sp.className="aq-chip"+(o[4]&&c?" warn":"");
+      sp.textContent=o[1]+" "+o[2].replace(/（.*）/,"")+" "+c; line.appendChild(sp);
+    });
+    sum.appendChild(line);
+  });
+  rows.appendChild(sum);
+
+  // 本人の状況ごとの一覧（重傷 → 軽傷 → 無事 → 回答途中 → 未回答）
+  var order=[
+    {key:"severe",label:"🔴 重傷・救助が必要",color:"#e74c3c"},
+    {key:"minor",label:"🟡 軽傷（自力で動ける）",color:"#d4a106"},
+    {key:"ok",label:"🟢 無事（ケガなし）",color:"#2e9e5b"},
+    {key:"partial",label:"✏️ 回答途中（①が未回答）",color:"#7f8c8d"},
     {key:"none",label:"⬜ 未回答",color:"#999"}
   ];
-  groups.forEach(function(g){
-    if(!byStatus[g.key].length) return;
+  order.forEach(function(g){
+    if(!groups[g.key].length) return;
     var sec=document.createElement("div");
     sec.style.cssText="margin-bottom:10px;border-radius:8px;overflow:hidden;border:1px solid #eee";
     var hdr=document.createElement("div");
     hdr.style.cssText="background:"+g.color+";color:#fff;padding:7px 12px;font-weight:700;font-size:13px";
-    hdr.textContent=g.label+" ("+byStatus[g.key].length+"名)";
+    hdr.textContent=g.label+" ("+groups[g.key].length+"名)";
     sec.appendChild(hdr);
-    byStatus[g.key].forEach(function(p){
+    groups[g.key].forEach(function(p){
       var row=document.createElement("div");
-      row.style.cssText="padding:7px 12px;font-size:14px;border-top:1px solid #f0f0f0;background:#fff;display:flex;justify-content:space-between;gap:8px";
+      row.style.cssText="padding:7px 12px;font-size:14px;border-top:1px solid #f0f0f0;background:#fff";
+      var top=document.createElement("div"); top.style.cssText="display:flex;justify-content:space-between;gap:8px";
       var nm=document.createElement("span"); nm.textContent=p.name;
-      var tm=document.createElement("span"); tm.style.cssText="font-size:11px;color:#999"; tm.textContent=p.time||"";
-      row.appendChild(nm); row.appendChild(tm);
+      if(p.r && !anpiComplete(p.r)) nm.textContent+="（あと"+anpiRemain(p.r)+"問）";
+      var tm=document.createElement("span"); tm.style.cssText="font-size:11px;color:#999"; tm.textContent=(p.r&&p.r.time)||"";
+      top.appendChild(nm); top.appendChild(tm); row.appendChild(top);
+      if(p.r){
+        var chips=document.createElement("div");
+        ["family","place","work"].forEach(function(k){
+          var o=anpiOpt(k,p.r[k]); if(!o) return;
+          var c=document.createElement("span"); c.className="aq-chip"+(o[4]?" warn":""); c.textContent=o[1]+" "+o[2];
+          chips.appendChild(c);
+        });
+        if(chips.childNodes.length) row.appendChild(chips);
+      }
       sec.appendChild(row);
     });
     rows.appendChild(sec);
@@ -722,13 +828,16 @@ function clearAnpiResult(){
     showToast("消去に失敗しました："+((e&&e.message)||""));
   });
 }
-function submitAnpi(status){
+function answerAnpi(qkey,val){
   if(!anpiData||!anpiData.active){ showToast("安否確認は終了しています"); return; }
   if(!db){ showToast("サーバーに接続できません。通信を確認してください"); return; }
-  var resp={name:hUser.name,status:status,time:new Date().toLocaleString("ja-JP")};
-  db.ref("anpiData/responses/"+safeKey(hUser.name)).set(resp).then(function(){
-    showToast(anpiStatusText(status)+" で回答しました");
-    clearAnpiNotifs();
+  var upd={name:hUser.name,time:new Date().toLocaleString("ja-JP")};
+  upd[qkey]=val;
+  db.ref("anpiData/responses/"+safeKey(hUser.name)).update(upd).then(function(){
+    var r=anpiNorm(myAnpiResp())||{}; r[qkey]=val;
+    var left=anpiRemain(r);
+    if(left===0){ showToast("✅ 回答が完了しました"); clearAnpiNotifs(); }
+    else showToast("保存しました（あと"+left+"問）");
   }).catch(function(e){
     showToast("回答に失敗しました："+((e&&e.message)||""));
   });
@@ -1801,7 +1910,7 @@ function updateDots(){
     var anpiActive=anpiData&&anpiData.active;
     if(anpiActive){
       var _myKey=safeKey(hUser.name);
-      var _answered=anpiData.responses&&anpiData.responses[_myKey];
+      var _answered=anpiComplete(anpiData.responses&&anpiData.responses[_myKey]);
       anpiDot.style.display=_answered?"none":"flex";
     } else {
       anpiDot.style.display="none";
