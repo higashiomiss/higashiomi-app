@@ -117,6 +117,19 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 .aq-sum{background:#fff;border:1px solid #eee;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;line-height:1.9}
 .aq-sum b{color:var(--navy)}
 @media(max-width:360px){.aq-g{grid-template-columns:1fr}}
+.us-sum{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+.us-sum div{flex:1;min-width:80px;background:#fff;border:1px solid var(--bd);border-radius:9px;padding:8px;text-align:center}
+.us-sum b{display:block;font-size:20px}
+.us-sum span{font-size:11px;color:var(--sub)}
+.us-sec{margin-bottom:10px;border-radius:9px;overflow:hidden;border:1px solid #e6e9f2;background:#fff}
+.us-hd{color:#fff;padding:7px 12px;font-weight:700;font-size:13px}
+.us-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid #f0f0f0;font-size:13px}
+.us-row .nm{flex:1;min-width:0}
+.us-row .nm b{font-size:14px}
+.us-row .dv{font-size:11px;color:var(--sub);line-height:1.5}
+.us-btn{background:#fff;border:1px solid #d9dde8;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-family:inherit;color:var(--sub);flex-shrink:0}
+.us-btn.red{border-color:#f3b8b8;color:var(--red)}
+.us-btn.grn{border-color:#a8d5b9;color:var(--gr)}
 </style>
 </head>
 <body>
@@ -248,6 +261,10 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
 </div>
 
 <div class="pg" id="pg-staff">
+  <div id="usageBar" style="display:none;margin-bottom:9px">
+    <button class="btn bsm" id="usageBtn" onclick="toggleUsage()" style="width:100%">📊 利用状況（アプリの設定確認・退職者の管理）</button>
+  </div>
+  <div id="usagePanel" style="display:none"></div>
   <div style="display:flex;gap:8px;margin-bottom:9px">
     <input class="fi" id="staffSearch" oninput="filterStaff(this.value)" placeholder="🔍  名前・部署で検索..." style="flex:1">
     <button class="btn bg bsm" onclick="openAddStaff()">＋ 追加</button>
@@ -343,6 +360,11 @@ nav{display:flex;background:var(--navy);border-top:1px solid rgba(255,255,255,0.
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div id="blockOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#1a3a7a;color:#fff;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:24px">
+  <div style="font-size:44px">🔒</div>
+  <div style="font-size:18px;font-weight:700;margin:10px 0">このアプリは利用できません</div>
+  <div style="font-size:14px;opacity:.85;line-height:1.8">管理者により利用が停止されています。<br>Ứng dụng này đã bị quản trị viên tạm dừng.<br>El administrador ha desactivado el acceso.</div>
+</div>
 <div class="mbg" id="transModal" style="z-index:600">
   <div style="background:#fff;border-radius:16px;width:93%;max-width:440px;padding:20px;max-height:80vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -417,9 +439,20 @@ function listenAll(){
       var arr=Object.values(v).filter(function(x){ return x&&x.name; });
       if(arr.length>0) staff=arr;
     }
+    allStaff=staff.filter(function(s){ return s && s.name; });
+    staff=allStaff.filter(function(s){ return !s.retired; });
+    staffLoaded=true;
+    checkAccess();
+    buildDeptFilters();
     renderStaff(staff);
     updateStaffCount();
+    if(usageOpen) renderUsage();
   });
+  // この端末が利用停止になっていないか
+  db.ref("blockedDevices/"+deviceId()).on("value", function(snap){
+    deviceBlocked=!!snap.val(); blockLoaded=true; checkAccess();
+  });
+  recordUsage();
   // 就業規則
   db.ref("rulesData").on("value", function(snap){
     var v=snap.val();
@@ -510,6 +543,7 @@ function enablePush(silent){
       return Promise.all(jobs).then(function(){
         lsSet("pushKey",key);
         updateNotifyUI();
+        recordUsage(true);
         if(!silent) showToast("🔔 通知を有効にしました");
       });
     });
@@ -844,6 +878,178 @@ function answerAnpi(qkey,val){
 }
 
 
+// ===== 利用状況・退職者 =====
+var allStaff=[];      // 退職者を含む全員（staff は在籍者だけ。読み込み後に入る）
+var userChosen=false;            // この端末で名前を選んだか
+var staffLoaded=false, blockLoaded=false, deviceBlocked=false;
+var usageData={}, usageTokens={}, usageOpen=false, usageListening=false, _lastUsageAt=0;
+function fullStaff(){
+  var ids={}; staff.forEach(function(s){ ids[normName(s.name)]=1; });
+  return staff.concat(allStaff.filter(function(s){ return s.retired && !ids[normName(s.name)]; }));
+}
+function isRetiredName(n){ return allStaff.some(function(s){ return s.retired && normName(s.name)===normName(n); }); }
+function detectPlatform(){ if(isIOS()) return "iPhone"; if(/Android/i.test(navigator.userAgent)) return "Android"; return "PC"; }
+function pushOn(){ try{ return !!window.Notification && Notification.permission==="granted" && lsGet("pushKey")===pushKeyFor(); }catch(e){ return false; } }
+// この端末の利用状況を記録（名前・機種・ホーム画面に追加済みか・通知が届くか・最終利用）
+function recordUsage(force){
+  if(!db) return;
+  var now=Date.now();
+  if(!force && now-_lastUsageAt<10*60*1000) return;
+  _lastUsageAt=now;
+  try{
+    var dev=deviceId();
+    var key=userChosen?safeKey(hUser.name):"_unset";
+    var prev=lsGet("usageKey");
+    if(prev && prev!==key) db.ref("usageData/"+prev+"/"+dev).remove();
+    lsSet("usageKey",key);
+    db.ref("usageData/"+key+"/"+dev).update({name:userChosen?hUser.name:"",platform:detectPlatform(),standalone:isStandalone(),push:pushOn(),lastSeen:now});
+  }catch(e){}
+}
+document.addEventListener("visibilitychange",function(){ if(document.visibilityState==="visible") recordUsage(false); });
+// 退職者・利用停止の端末ならアプリを隠し、通知も止める
+function checkAccess(){
+  if(!staffLoaded || !blockLoaded) return;
+  var blocked=deviceBlocked || (userChosen && isRetiredName(hUser.name));
+  var ov=document.getElementById("blockOverlay");
+  if(blocked){
+    lsSet("blockedFlag","1");
+    if(ov) ov.style.display="flex";
+    var pk=lsGet("pushKey"); if(db && pk){ db.ref("pushTokens/"+pk).remove(); lsSet("pushKey",""); }
+  } else {
+    lsSet("blockedFlag","");
+    if(ov) ov.style.display="none";
+  }
+}
+function toggleUsage(){
+  if(!isSafetyAdmin()){ showToast("利用状況は管理者のみ確認できます"); return; }
+  usageOpen=!usageOpen;
+  document.getElementById("usagePanel").style.display=usageOpen?"block":"none";
+  document.getElementById("usageBtn").textContent=usageOpen?"✕ 利用状況を閉じる":"📊 利用状況（アプリの設定確認・退職者の管理）";
+  if(usageOpen && !usageListening && db){
+    usageListening=true;
+    db.ref("usageData").on("value",function(snap){ usageData=snap.val()||{}; if(usageOpen) renderUsage(); });
+    db.ref("pushTokens").on("value",function(snap){ usageTokens=snap.val()||{}; if(usageOpen) renderUsage(); });
+  }
+  if(usageOpen) renderUsage();
+}
+function fmtTime(ms){ if(!ms) return ""; var d=new Date(ms); return (d.getMonth()+1)+"/"+d.getDate()+" "+pad(d.getHours())+":"+pad(d.getMinutes()); }
+function tokenCount(name){
+  var key=safeKey(name), n=0;
+  Object.keys(usageTokens).forEach(function(k){ if(k===key || k.indexOf(key+"__")===0) n++; });
+  return n;
+}
+// 1人分の状況：done=設定完了／partial=途中／none=未利用
+function staffUsage(name){
+  var recs=usageData[safeKey(name)]||{};
+  var devs=Object.keys(recs).map(function(k){ var r=recs[k]||{}; return {id:k,platform:r.platform,standalone:r.standalone,push:r.push,lastSeen:r.lastSeen}; });
+  var tokens=tokenCount(name);
+  var ok=devs.some(function(d){ return d.push && (d.standalone || d.platform==="PC"); }) || (tokens>0 && !devs.length);
+  var last=0; devs.forEach(function(d){ if(d.lastSeen>last) last=d.lastSeen; });
+  var state=ok?"done":(devs.length||tokens?"partial":"none");
+  var notes=[];
+  if(state==="partial"){
+    if(!devs.some(function(d){ return d.standalone || d.platform==="PC"; })) notes.push("ホーム画面に未追加");
+    if(!devs.some(function(d){ return d.push; }) && !tokens) notes.push("通知が未登録");
+  }
+  if(!devs.length && tokens) notes.push("通知登録済み（アプリを次に開いた時に詳細が記録されます）");
+  return {state:state,devs:devs,last:last,notes:notes};
+}
+function devText(d){
+  var t=d.platform||"?";
+  if(d.platform!=="PC") t+=d.standalone?"・ホーム画面":"・ブラウザ";
+  t+=d.push?"・通知ON":"・通知OFF";
+  return t;
+}
+function renderUsage(){
+  var panel=document.getElementById("usagePanel"); if(!panel) return;
+  panel.innerHTML="";
+  var groups={none:[],partial:[],done:[]};
+  staff.forEach(function(s){ var u=staffUsage(s.name); u.s=s; groups[u.state].push(u); });
+  var unset=Object.keys(usageData._unset||{}).length;
+  // 集計
+  var sum=document.createElement("div"); sum.className="us-sum";
+  [["done","✅ 設定完了","#2a7a4a"],["partial","🟡 途中","#b7860b"],["none","❌ 未利用","#c0392b"]].forEach(function(g){
+    var d=document.createElement("div");
+    var b=document.createElement("b"); b.style.color=g[2]; b.textContent=groups[g[0]].length;
+    var sp=document.createElement("span"); sp.textContent=g[1];
+    d.appendChild(b); d.appendChild(sp); sum.appendChild(d);
+  });
+  panel.appendChild(sum);
+  var note=document.createElement("div");
+  note.style.cssText="font-size:11px;color:var(--sub);margin:-3px 0 9px;line-height:1.6";
+  note.textContent="在籍 "+staff.length+"名。設定完了＝ホーム画面に追加（PCはブラウザ）＋通知ON。"+(unset?"名前を選ばずに開いた端末が "+unset+"台 あります。":"")+"この機能を入れる前に設定した人は、次にアプリを開いた時に記録されます。";
+  panel.appendChild(note);
+  // 一覧
+  [["none","❌ 未利用（まだ開いていない）","#c0392b"],["partial","🟡 途中（設定が終わっていない）","#b7860b"],["done","✅ 設定完了","#2a7a4a"]].forEach(function(g){
+    var list=groups[g[0]]; if(!list.length) return;
+    var sec=document.createElement("div"); sec.className="us-sec";
+    var hd=document.createElement("div"); hd.className="us-hd"; hd.style.background=g[2]; hd.textContent=g[1]+"　"+list.length+"名";
+    sec.appendChild(hd);
+    list.forEach(function(u){
+      var row=document.createElement("div"); row.className="us-row";
+      var nm=document.createElement("div"); nm.className="nm";
+      var b=document.createElement("b"); b.textContent=u.s.name; nm.appendChild(b);
+      var dp=document.createElement("span"); dp.style.cssText="font-size:11px;color:var(--sub);margin-left:6px"; dp.textContent=u.s.dept||""; nm.appendChild(dp);
+      var lines=u.devs.map(devText);
+      if(u.notes.length) lines.push("⚠ "+u.notes.join("・"));
+      if(u.last) lines.push("最終利用 "+fmtTime(u.last));
+      if(lines.length){ var dv=document.createElement("div"); dv.className="dv"; dv.textContent=lines.join("　"); nm.appendChild(dv); }
+      row.appendChild(nm);
+      if(!SAFETY_ADMINS.some(function(a){ return normName(a)===normName(u.s.name); })){
+        var btn=document.createElement("button"); btn.className="us-btn red"; btn.textContent="退職にする";
+        btn.onclick=function(){ setRetired(u.s.name,true); };
+        row.appendChild(btn);
+      }
+      sec.appendChild(row);
+    });
+    panel.appendChild(sec);
+  });
+  // 退職者
+  var retired=allStaff.filter(function(s){ return s.retired; });
+  var sec=document.createElement("div"); sec.className="us-sec";
+  var hd=document.createElement("div"); hd.className="us-hd"; hd.style.background="#5a6480"; hd.textContent="🔒 退職者（利用停止中）　"+retired.length+"名";
+  sec.appendChild(hd);
+  if(!retired.length){
+    var em=document.createElement("div"); em.className="us-row"; em.style.color="var(--sub)"; em.textContent="退職者はいません。在籍者の「退職にする」で利用を停止できます。";
+    sec.appendChild(em);
+  }
+  retired.forEach(function(s){
+    var row=document.createElement("div"); row.className="us-row";
+    var nm=document.createElement("div"); nm.className="nm";
+    var b=document.createElement("b"); b.textContent=s.name; nm.appendChild(b);
+    var dv=document.createElement("div"); dv.className="dv"; dv.textContent=(s.dept||"")+(s.retiredAt?"　停止 "+fmtTime(s.retiredAt):""); nm.appendChild(dv);
+    row.appendChild(nm);
+    var btn=document.createElement("button"); btn.className="us-btn grn"; btn.textContent="利用を再開";
+    btn.onclick=function(){ setRetired(s.name,false); };
+    row.appendChild(btn);
+    sec.appendChild(row);
+  });
+  panel.appendChild(sec);
+}
+// 退職にする／利用を再開する
+function setRetired(name,flag){
+  if(!isSafetyAdmin()){ showToast("管理者のみ操作できます"); return; }
+  if(!db){ showToast("サーバーに接続できません"); return; }
+  if(flag && normName(name)===normName(hUser.name)){ showToast("自分自身は退職にできません"); return; }
+  if(flag && SAFETY_ADMINS.some(function(a){ return normName(a)===normName(name); })){ showToast("管理者は退職にできません"); return; }
+  var msg=flag?name+" さんを退職者にしますか？\nこの人のスマホではアプリが表示されなくなり、通知も届かなくなります。\n（「利用を再開」で戻せます）":name+" さんの利用を再開しますか？";
+  if(!confirm(msg)) return;
+  var key=safeKey(name);
+  var list=allStaff.map(function(x){
+    var o={}; for(var k in x) o[k]=x[k];
+    if(normName(x.name)===normName(name)){ if(flag){ o.retired=true; o.retiredAt=Date.now(); } else { delete o.retired; delete o.retiredAt; } }
+    return o;
+  });
+  var jobs=[db.ref("staffData").set(list)];
+  Object.keys(usageData[key]||{}).forEach(function(dev){
+    jobs.push(flag ? db.ref("blockedDevices/"+dev).set({name:name,at:Date.now()}) : db.ref("blockedDevices/"+dev).remove());
+  });
+  if(flag) Object.keys(usageTokens).forEach(function(k){ if(k===key || k.indexOf(key+"__")===0) jobs.push(db.ref("pushTokens/"+k).remove()); });
+  Promise.all(jobs).then(function(){
+    showToast(flag?"🔒 "+name+" さんの利用を停止しました":"✅ "+name+" さんの利用を再開しました");
+  }).catch(function(e){ showToast("失敗しました："+((e&&e.message)||"")); });
+}
+
 // ===== データ保存 =====
 function saveData(){
   var p=Promise.resolve();
@@ -853,7 +1059,7 @@ function saveData(){
         db.ref("schedData").set(schedData),
         db.ref("boardData").set(boardData),
         db.ref("survData").set(survData),
-        db.ref("staffData").set(staff)
+        db.ref("staffData").set(fullStaff())
       ]);
     }catch(e){}
   }
@@ -925,12 +1131,13 @@ var deptVi={"本社":"Tổng công ty","営業課":"Phòng kinh doanh","プレ�
 // ===== ホームユーザー =====
 var hUser={name:"近藤 竜二",dept:"株式会社東近江製作所",ini:"近"};
 function saveUser(){
+  userChosen=true;
   try{ localStorage.setItem("hUser2",JSON.stringify(hUser)); }catch(e){}
   try{ document.cookie="hUser="+encodeURIComponent(JSON.stringify(hUser))+";max-age=31536000;path=/"; }catch(e){}
 }
 function loadUser(){
-  try{ var ls=localStorage.getItem("hUser2"); if(ls){var u=JSON.parse(ls);if(u&&u.name){hUser=u;return;}} }catch(e){}
-  try{ var m=document.cookie.match(/hUser=([^;]+)/); if(m){var u=JSON.parse(decodeURIComponent(m[1]));if(u&&u.name){hUser=u;}} }catch(e){}
+  try{ var ls=localStorage.getItem("hUser2"); if(ls){var u=JSON.parse(ls);if(u&&u.name){hUser=u;userChosen=true;return;}} }catch(e){}
+  try{ var m=document.cookie.match(/hUser=([^;]+)/); if(m){var u=JSON.parse(decodeURIComponent(m[1]));if(u&&u.name){hUser=u;userChosen=true;}} }catch(e){}
 }
 
 // ===== データ =====
@@ -1243,7 +1450,7 @@ function submitModal(){
     if(v){ hUser.name=v.split("|")[0]; hUser.dept=document.getElementById("fhdept").value||hUser.dept; }
     else { hUser.dept=document.getElementById("fhdept").value||hUser.dept; }
     hUser.ini=document.getElementById("fhini").value||hUser.ini;
-    applyUser(); saveUser(); renderAnpi(); if(lsGet("pushKey")&&window.Notification&&Notification.permission==="granted") enablePush(true); else updateNotifyUI(); showToast(t("updated"));
+    applyUser(); saveUser(); renderAnpi(); checkAccess(); recordUsage(true); renderStaff(staff); if(lsGet("pushKey")&&window.Notification&&Notification.permission==="granted") enablePush(true); else updateNotifyUI(); showToast(t("updated"));
   } else if(modalMode==="editsched"){
     var ds=document.getElementById("feschedds").value;
     var id=parseInt(document.getElementById("feschedid").value);
@@ -1888,6 +2095,8 @@ function updateStaffCount(){
   if(el) el.textContent=staff.length;
 }
 function renderStaff(data){
+  var ub=document.getElementById("usageBar"); if(ub) ub.style.display=isSafetyAdmin()?"block":"none";
+  if(!isSafetyAdmin() && usageOpen){ usageOpen=false; var up=document.getElementById("usagePanel"); if(up) up.style.display="none"; }
   var grid=document.getElementById("staffGrid"); grid.innerHTML="";
   var colors=["#1a3a7a","#2a5ab5","#e8a020","#2a7a4a","#8a2020","#6a2a8a","#1a6a7a"];
   data.forEach(function(s){
@@ -2032,6 +2241,7 @@ function renderAll(){
 
 // ===== 初期化 =====
 loadUser();
+if(lsGet("blockedFlag")){ var _bo=document.getElementById("blockOverlay"); if(_bo) _bo.style.display="flex"; }
 applyUser();
 renderAll();
 buildDeptFilters();
